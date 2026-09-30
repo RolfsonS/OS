@@ -10,6 +10,7 @@ typedef struct bar_s {
 	uint8_t memory;
 	uint8_t type;
 	uint8_t prefetch;
+	uint8_t used;
 } bar_t;
 
 
@@ -148,8 +149,11 @@ void print_dev_info(pci_device0_t* pci_dev);
  */
 void config_bars(uint8_t bus, uint8_t device, uint8_t func, pci_device0_t* pci_dev);
 
-
-void pring_bars(pci_device0_t* pci_dev);
+/* Print base address registers for a device.
+ *
+ * Param: pci_device0_t* pci_dev, Device to print bar info
+ */
+void print_bars(pci_device0_t* pci_dev);
 
 
 

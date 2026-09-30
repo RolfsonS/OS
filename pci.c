@@ -14,11 +14,17 @@ void init_pci() {
 	
 	pci_device0_t* test = pci_device0_info;
 	
-
-/*	while(test) {
-		print_dev_info(test);
+	//print_dev_info(test);
+	//print_bars(test);
+	uint8_t iter = 0;
+	while(test) {
+		if(iter == 4 || iter == 5) { 
+			print_dev_info(test);
+			print_bars(test);
+		}
+		iter++;
 		test = test -> next;
-	} */
+	} 
 }
 
 uint32_t pci_reg_read(uint8_t bus, uint8_t device, uint8_t func, uint8_t reg) {
@@ -158,20 +164,41 @@ void print_dev_info(pci_device0_t* pci_dev) {
 
 void config_bars(uint8_t bus, uint8_t device, uint8_t func, pci_device0_t* pci_dev) {
 	for(size_t bar = 0; bar < 6; bar++) {
-		uint32_t read_bar = pci_reg_read(bus, device, func, (0x10 + (0x4 * bar)));
-		if(!(read_bar && 0x1)) {
+		uint8_t offset = 0x10 + (0x4 * bar);
+		uint32_t read_bar = pci_reg_read(bus, device, func, offset);
+		if(read_bar == 0x0) {
+			(pci_dev -> bars + bar) -> used 	= 0x0; 
+		} else if(!(read_bar & 0x1)) {
+			(pci_dev -> bars + bar) -> used 	= 0x1; 
 			(pci_dev -> bars + bar) -> addr 	= read_bar & 0xFFFFFFF0;
 			(pci_dev -> bars + bar) -> memory 	= 0x1;
 			(pci_dev -> bars + bar) -> type		= (read_bar >> 0x1) & 0x3;
 			(pci_dev -> bars + bar) -> prefetch	= (read_bar >> 0x3) & 0x1; 
 		} else {
+			(pci_dev -> bars + bar) -> used 	= 0x1;
 			(pci_dev -> bars + bar) -> addr 	= read_bar & 0xFFFFFFFC;
 			(pci_dev -> bars + bar) -> memory 	= 0x0;
 		}
 	}
 }
 
-
+void print_bars(pci_device0_t* pci_dev) {
+	/* PCI Type 0 devices have 6 base address registers. */
+	for(size_t bar = 0; bar < 6; bar++) {
+		/* Using pci_dev -> bars[bar]. instead of double ->, as seen above. */
+		if(pci_dev -> bars[bar].used == 0x0) {
+			kprintf("BAR not in use\n");
+		} else if(pci_dev -> bars[bar].memory)  {
+			uint32_t addr	 = pci_dev -> bars[bar].addr;
+			uint8_t type 	 = pci_dev -> bars[bar].type;
+			uint8_t prefetch = pci_dev -> bars[bar].prefetch;
+			kprintf("ADDR: %x, TYPE: %x, PREFETCH: %x \n", addr, type, prefetch);
+		} else {
+			uint32_t addr = pci_dev -> bars[bar].addr;
+			kprintf("ADDR: %x \n", addr);
+		}
+	}
+}
 
 
 

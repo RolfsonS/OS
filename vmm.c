@@ -52,7 +52,7 @@ void map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags) {
 	// Obtain the PDE at that entry, check present bit
 	uint32_t pde = kernel_pd[page_dir];
 
-	if(!(pde && 0x1)) {
+	if(!(pde & 0x1)) {
 		/* Creates a PDE.
 		 * It is important to note, the second a PDE is created all PTEs are created.
 		 * However, they are marked NOT present. As a result, the large chunks of RAM 
@@ -81,7 +81,7 @@ void map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags) {
 	uint32_t* known = known_addr;
 	known += page_table;
 
-	if(!(*known && 0x1)) {
+	if(!(*known & 0x1)) {
 		/* Create a valid PTE for this memory location */
 		*known = create_pte(p_addr, flags);
 	} else {
