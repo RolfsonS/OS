@@ -1,0 +1,186 @@
+#include <stddef.h>
+#include <stdint.h>
+
+#include "pci.h"
+#include "kprintf.h"
+#include "io.h"
+#include "heap.h"
+
+/* Pointer to PCI enumerated PCI device info on kernel heap. */
+pci_device0_t* pci_device0_info = NULL;
+
+void init_pci() {
+	brute_force_pci();
+	
+	pci_device0_t* test = pci_device0_info;
+	
+
+/*	while(test) {
+		print_dev_info(test);
+		test = test -> next;
+	} */
+}
+
+uint32_t pci_reg_read(uint8_t bus, uint8_t device, uint8_t func, uint8_t reg) {
+	uint32_t address;
+	
+	/* Bit shifts */
+	address = ((uint32_t)bus) << 16;
+	address |= ((uint32_t)device) << 11;
+	address |= ((uint32_t)func) << 8;
+	address |= ((uint32_t)reg) | 0x80000000;
+	//kprintf("ADDRESS: %x", address);
+	
+	/* Load IO port with PCI information, receive data back */
+	outl(CONFIG_ADDRESS, address);
+	return inl(CONFIG_DATA);
+}
+
+uint32_t pci_reg_read32(uint32_t config) {
+	outl(CONFIG_ADDRESS, config);
+	return inl(CONFIG_DATA);
+}
+
+uint16_t pci_device_id(uint32_t pci_reg) {
+	return (uint16_t)(pci_reg >> 16);
+}
+
+uint16_t pci_vendor_id(uint32_t pci_reg) {
+	return (uint16_t)pci_reg;
+}
+
+uint8_t pci_class_code(uint32_t pci_reg) {
+	return (uint8_t)(pci_reg >> 24);
+}
+
+uint8_t pci_subclass(uint32_t pci_reg) {
+	return (uint8_t)(pci_reg >> 16);
+}
+
+uint8_t pci_prog_if(uint32_t pci_reg) {
+	return (uint8_t)(pci_reg >> 8);
+}
+
+uint8_t pci_revision_id(uint32_t pci_reg) {
+	return (uint8_t) pci_reg;
+}
+
+void brute_force_pci() {
+	/* 8 Bits for bus field, maximum of 256 buses */
+	for(size_t bus = 0; bus < 256; bus++) {
+		enumerate_bus(bus);
+	}
+}
+
+void enumerate_bus(uint8_t bus) {
+	/* Device number field is 5 bits, 32 devices max on each bus */
+	for(size_t device = 0; device < 32; device++) {
+		enumerate_device(bus, device);
+	}
+}
+
+void enumerate_device(uint8_t bus, uint8_t device) {
+	/* Function number field is three bits, 8 functions max on each device. */
+	for(size_t func = 0; func < 8; func++) {
+		uint16_t ven_id = pci_vendor_id(pci_reg_read(bus, device, func, 0)); 
+		if(ven_id != 0xFFFF) {
+			add_dev(bus, device, func);
+		}
+	}
+}
+
+void add_dev(uint8_t bus, uint8_t device, uint8_t func) {
+	/* Check whether or not the global pointer to heap data structure is intialized.
+	 * If not NULL, we know we can walk the list.
+	 */
+	if(!pci_device0_info) {
+		pci_device0_info = (pci_device0_t*) kmalloc(sizeof(pci_device0_t)); 
+
+		/* Initialize the struct, set the next struct to NULL */
+		add_dev_info(bus, device, func, pci_device0_info);
+		pci_device0_info -> next = NULL;
+	} else {
+		/* Do to naming, check the first pointer */
+		pci_device0_t* next_dev = pci_device0_info -> next;
+		if (!next_dev) {
+			pci_device0_info -> next = (pci_device0_t*) kmalloc(sizeof(pci_device0_t));
+			add_dev_info(bus, device, func, pci_device0_info -> next);
+			pci_device0_info -> next -> next = NULL;
+		} else {
+			/* More general, iterative case */
+			next_dev = pci_device0_info -> next;
+			while(next_dev -> next) {
+				next_dev = next_dev -> next;	
+			}
+			next_dev -> next = (pci_device0_t*) kmalloc(sizeof(pci_device0_t));
+			add_dev_info(bus, device, func, next_dev -> next);
+			next_dev -> next -> next = NULL;
+		}
+	} 
+}
+
+void add_dev_info(uint8_t bus, uint8_t device, uint8_t func, pci_device0_t* pci_dev) {
+	/* All relevant register reads. */
+	uint32_t reg_0x0	= pci_reg_read(bus, device, func, 0x0);
+	uint32_t reg_0x8	= pci_reg_read(bus, device, func, 0x8);
+
+	/* All relevant fields extracted from register reads. */
+	uint16_t dev_id 	= pci_device_id(reg_0x0);
+	uint16_t ven_id		= pci_vendor_id(reg_0x0);
+
+	uint8_t class_code 	= pci_class_code(reg_0x8);
+	uint8_t subclass	= pci_subclass(reg_0x8);
+	uint8_t prog_if		= pci_prog_if(reg_0x8);
+	uint8_t revision_id	= pci_revision_id(reg_0x8);
+
+	/* Relevant struct assignments */
+	pci_dev -> device 	= device;
+	pci_dev -> bus 		= bus;
+	pci_dev -> function 	= func;
+	
+	pci_dev -> device_id 	= dev_id;
+	pci_dev -> vendor_id 	= ven_id;
+
+	pci_dev -> class_code 	= class_code;
+	pci_dev -> subclass	= subclass;
+	pci_dev -> prog_if	= prog_if;
+	pci_dev -> revision_id 	= revision_id;
+
+	/* Configure the base address registers of the device */
+	config_bars(bus, device, func, pci_dev);
+}  
+
+void print_dev_info(pci_device0_t* pci_dev) {
+	kprintf("Bus: %x, Device: %x, Function: %x\n", pci_dev -> bus, pci_dev -> device, pci_dev -> function);
+	kprintf("Dev_ID: %x, Vendor: %x \n", pci_dev -> device_id, pci_dev -> vendor_id);
+	kprintf("CC: %x, SC: %x, PROGIF: %x, REV: %x \n\n", pci_dev -> class_code, pci_dev -> subclass, pci_dev -> prog_if, pci_dev -> revision_id);
+}
+
+void config_bars(uint8_t bus, uint8_t device, uint8_t func, pci_device0_t* pci_dev) {
+	for(size_t bar = 0; bar < 6; bar++) {
+		uint32_t read_bar = pci_reg_read(bus, device, func, (0x10 + (0x4 * bar)));
+		if(!(read_bar && 0x1)) {
+			(pci_dev -> bars + bar) -> addr 	= read_bar & 0xFFFFFFF0;
+			(pci_dev -> bars + bar) -> memory 	= 0x1;
+			(pci_dev -> bars + bar) -> type		= (read_bar >> 0x1) & 0x3;
+			(pci_dev -> bars + bar) -> prefetch	= (read_bar >> 0x3) & 0x1; 
+		} else {
+			(pci_dev -> bars + bar) -> addr 	= read_bar & 0xFFFFFFFC;
+			(pci_dev -> bars + bar) -> memory 	= 0x0;
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
