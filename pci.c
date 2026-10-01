@@ -10,8 +10,14 @@
 pci_device0_t* pci_device0_info = NULL;
 
 void init_pci() {
+	/* Brute forcing PCI space sets up PCI device list and certain BAR information.
+	 * However, we still need to determine the amount of address space taken by the BAR.
+	 * This is done in the proceeding function call. 
+	 */
 	brute_force_pci();
-	
+
+
+
 	pci_device0_t* test = pci_device0_info;
 	
 	//print_dev_info(test);
@@ -21,6 +27,7 @@ void init_pci() {
 		if(iter == 4 || iter == 5) { 
 			print_dev_info(test);
 			print_bars(test);
+			config_addr_space(test);
 		}
 		iter++;
 		test = test -> next;
@@ -35,11 +42,23 @@ uint32_t pci_reg_read(uint8_t bus, uint8_t device, uint8_t func, uint8_t reg) {
 	address |= ((uint32_t)device) << 11;
 	address |= ((uint32_t)func) << 8;
 	address |= ((uint32_t)reg) | 0x80000000;
-	//kprintf("ADDRESS: %x", address);
 	
 	/* Load IO port with PCI information, receive data back */
 	outl(CONFIG_ADDRESS, address);
 	return inl(CONFIG_DATA);
+}
+
+void pci_reg_write(uint8_t bus, uint8_t device, uint8_t func, uint8_t reg, uint32_t data) {
+	uint32_t address;
+	
+	/* Bit shifts */
+	address = ((uint32_t)bus) << 16;
+	address |= ((uint32_t)device) << 11;
+	address |= ((uint32_t)func) << 8;
+	address |= ((uint32_t)reg) | 0x80000000;
+	
+	outl(CONFIG_ADDRESS, address);
+	outl(CONFIG_DATA, data);
 }
 
 uint32_t pci_reg_read32(uint32_t config) {
@@ -200,7 +219,35 @@ void print_bars(pci_device0_t* pci_dev) {
 	}
 }
 
+void config_addr_space(pci_device0_t* pci_dev) {
+	for(size_t bar = 0; bar < 6; bar++) {
+		if(!(pci_dev -> bars[bar].used)) {
+			continue;
+		}
 
+		/* To determine the amount of address spave needed by a PCI device,
+		 * write a value of all 1's to BAR, then read it back.
+		 */
+		uint8_t reg = 0x10 + (0x4 * bar);
+		uint32_t val = 0xFFFFFFFF;
+		pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, reg, val);
+		uint32_t addr_space = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, reg);
+
+		/* Depending on BAR type, MMIO or Port Based IO, apply mask, extract */
+		if(pci_dev -> bars[bar].memory) {
+			addr_space &= 0xFFFFFFF0;
+		} else {
+			addr_space &= 0xFFFFFFFC;
+		}
+		addr_space = ~addr_space;
+		addr_space += 0x1;
+
+		/* Write this to correct BAR, and restore original BAR config space */
+		// Fix this tomorrow (rewrite correct value back, also add PCI Bus Mastering and debug options)
+		pci_dev -> bars[bar].size = addr_space;
+		pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, reg, pci_dev -> bars[bar].addr);
+	}
+}
 
 
 

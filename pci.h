@@ -11,6 +11,8 @@ typedef struct bar_s {
 	uint8_t type;
 	uint8_t prefetch;
 	uint8_t used;
+
+	uint32_t size;
 } bar_t;
 
 
@@ -42,6 +44,8 @@ void init_pci();
  * Return: uint32_t, Value from selected register on device via I/O ports
  */
 uint32_t pci_reg_read(uint8_t bus, uint8_t device, uint8_t func, uint8_t reg);
+
+void pci_reg_write(uint8_t bus, uint8_t device, uint8_t func, uint8_t reg, uint32_t data);
 
 /* An existing read has been performed, no need to reform bits.
  *
@@ -155,6 +159,10 @@ void config_bars(uint8_t bus, uint8_t device, uint8_t func, pci_device0_t* pci_d
  */
 void print_bars(pci_device0_t* pci_dev);
 
-
+/* Configure the address space needed by a PCI device.
+ *
+ * Param: pci_device_t* pci_dev, Device to configure.
+ */ 
+void config_addr_space(pci_device0_t* pci_dev);
 
 #endif
