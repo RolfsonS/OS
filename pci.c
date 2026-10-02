@@ -16,18 +16,12 @@ void init_pci() {
 	 */
 	brute_force_pci();
 
-
-
 	pci_device0_t* test = pci_device0_info;
 	
-	//print_dev_info(test);
-	//print_bars(test);
 	uint8_t iter = 0;
 	while(test) {
 		if(iter == 4 || iter == 5) { 
 			print_dev_info(test);
-			print_bars(test);
-			config_addr_space(test);
 		}
 		iter++;
 		test = test -> next;
@@ -173,12 +167,18 @@ void add_dev_info(uint8_t bus, uint8_t device, uint8_t func, pci_device0_t* pci_
 
 	/* Configure the base address registers of the device */
 	config_bars(bus, device, func, pci_dev);
+	/* Extract Size --> Must enable Command Reg first */
+	enable_addr_read(pci_dev);
 }  
 
 void print_dev_info(pci_device0_t* pci_dev) {
 	kprintf("Bus: %x, Device: %x, Function: %x\n", pci_dev -> bus, pci_dev -> device, pci_dev -> function);
 	kprintf("Dev_ID: %x, Vendor: %x \n", pci_dev -> device_id, pci_dev -> vendor_id);
-	kprintf("CC: %x, SC: %x, PROGIF: %x, REV: %x \n\n", pci_dev -> class_code, pci_dev -> subclass, pci_dev -> prog_if, pci_dev -> revision_id);
+	kprintf("CC: %x, SC: %x, PROGIF: %x, REV: %x \n", pci_dev -> class_code, pci_dev -> subclass, pci_dev -> prog_if, pci_dev -> revision_id);
+
+	/* Print BAR info for the device aswell */
+	print_bars(pci_dev);
+	kprintf("\n");
 }
 
 void config_bars(uint8_t bus, uint8_t device, uint8_t func, pci_device0_t* pci_dev) {
@@ -206,47 +206,73 @@ void print_bars(pci_device0_t* pci_dev) {
 	for(size_t bar = 0; bar < 6; bar++) {
 		/* Using pci_dev -> bars[bar]. instead of double ->, as seen above. */
 		if(pci_dev -> bars[bar].used == 0x0) {
-			kprintf("BAR not in use\n");
+			// kprintf("BAR not in use\n");
+			continue;
 		} else if(pci_dev -> bars[bar].memory)  {
 			uint32_t addr	 = pci_dev -> bars[bar].addr;
 			uint8_t type 	 = pci_dev -> bars[bar].type;
 			uint8_t prefetch = pci_dev -> bars[bar].prefetch;
-			kprintf("ADDR: %x, TYPE: %x, PREFETCH: %x \n", addr, type, prefetch);
+			uint32_t size 	 = pci_dev -> bars[bar].size;
+			kprintf("ADDR: %x, TYPE: %x, PREFETCH: %x, SIZE: %x\n", addr, type, prefetch, size);
 		} else {
-			uint32_t addr = pci_dev -> bars[bar].addr;
-			kprintf("ADDR: %x \n", addr);
+			uint32_t addr 	= pci_dev -> bars[bar].addr;
+			uint32_t size 	= pci_dev -> bars[bar].size; 
+			kprintf("ADDR: %x, SIZE: %x \n", addr, size);
 		}
 	}
 }
 
-void config_addr_space(pci_device0_t* pci_dev) {
-	for(size_t bar = 0; bar < 6; bar++) {
-		if(!(pci_dev -> bars[bar].used)) {
-			continue;
-		}
+void enable_addr_read(pci_device0_t* pci_dev) {
+	/* As reading addresses from bars requires these bits, we just wrap that behavior in this function.
+	 * So, we must read reg, modify 2 lowest bits, and write back.
+	 */
+	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
+	uint32_t reg_dis = reg_val ^ 0x3;
+	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_dis);
 
-		/* To determine the amount of address spave needed by a PCI device,
-		 * write a value of all 1's to BAR, then read it back.
-		 */
-		uint8_t reg = 0x10 + (0x4 * bar);
-		uint32_t val = 0xFFFFFFFF;
-		pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, reg, val);
-		uint32_t addr_space = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, reg);
-
-		/* Depending on BAR type, MMIO or Port Based IO, apply mask, extract */
-		if(pci_dev -> bars[bar].memory) {
-			addr_space &= 0xFFFFFFF0;
-		} else {
-			addr_space &= 0xFFFFFFFC;
-		}
-		addr_space = ~addr_space;
-		addr_space += 0x1;
-
-		/* Write this to correct BAR, and restore original BAR config space */
-		// Fix this tomorrow (rewrite correct value back, also add PCI Bus Mastering and debug options)
-		pci_dev -> bars[bar].size = addr_space;
-		pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, reg, pci_dev -> bars[bar].addr);
+	/* Now, we are good to Read/Write to BARs without issue. 
+	 */
+	for(uint8_t bar = 0; bar < 6; bar++) {
+		config_addr_space(pci_dev, bar);	
 	}
+	
+	/* Restore Command Reg */
+	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
+}
+
+void config_addr_space(pci_device0_t* pci_dev, uint8_t bar) {
+	if(!(pci_dev -> bars[bar].used)) {
+		return;
+	}
+
+	/* To determine the amount of address spave needed by a PCI device,
+	 * write a value of all 1's to BAR, then read it back.
+	 */
+	uint8_t reg = 0x10 + (0x4 * bar);
+	uint32_t val = 0xFFFFFFFF;
+	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, reg, val);
+	uint32_t addr_space = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, reg);
+
+	/* Depending on BAR type, MMIO or Port Based IO, apply mask, extract */
+	if(pci_dev -> bars[bar].memory) {
+		addr_space &= 0xFFFFFFF0;
+	} else {
+		addr_space &= 0xFFFFFFFC;
+	}
+	addr_space = ~addr_space;
+	addr_space += 0x1;
+
+	/* Write this to correct BAR, and restore original BAR config space */
+	pci_dev -> bars[bar].size = addr_space;
+	uint32_t original_bar = 0;
+	if (pci_dev -> bars[bar].memory) {
+		original_bar = pci_dev -> bars[bar].addr |
+			       (uint32_t)(pci_dev -> bars[bar].prefetch << 3) |
+			       (uint32_t)(pci_dev -> bars[bar].type << 2);
+	} else {
+		original_bar = pci_dev -> bars[bar].addr;
+	}
+	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, reg, original_bar);
 }
 
 

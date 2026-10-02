@@ -143,7 +143,6 @@ void add_dev_info(uint8_t bus, uint8_t device, uint8_t func, pci_device0_t* pci_
  */
 void print_dev_info(pci_device0_t* pci_dev);
 
-
 /* Configures the base address registers for a PCI device.
  *
  * Param: uint8_t bus, Bus the device exist on
@@ -159,10 +158,16 @@ void config_bars(uint8_t bus, uint8_t device, uint8_t func, pci_device0_t* pci_d
  */
 void print_bars(pci_device0_t* pci_dev);
 
+/* Before attempting to read information about the BAR, disable both I/O and Memory decode.
+ * Some devices are known to decode the write of all ones to registers as unitended access.
+ *
+ */
+void enable_addr_read(pci_device0_t* pci_dev);
+
 /* Configure the address space needed by a PCI device.
  *
  * Param: pci_device_t* pci_dev, Device to configure.
  */ 
-void config_addr_space(pci_device0_t* pci_dev);
+void config_addr_space(pci_device0_t* pci_dev, uint8_t bar);
 
 #endif
