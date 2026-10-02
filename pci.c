@@ -275,9 +275,19 @@ void config_addr_space(pci_device0_t* pci_dev, uint8_t bar) {
 	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, reg, original_bar);
 }
 
+void en_bus_master(pci_device0_t* pci_dev) {
+	/* Enable Bus Mastering for a PCI Device */
+	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
+	reg_val ^= 0x4;
+	pci_write_reg(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
+}
 
-
-
+void dis_bus_master(pci_device0_t* pci_dev) {
+	/* Disable Bus Mastering for a PCI Device */
+	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
+	reg_val ^= 0x4;
+	pci_write_reg(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
+}
 
 
 

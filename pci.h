@@ -170,4 +170,9 @@ void enable_addr_read(pci_device0_t* pci_dev);
  */ 
 void config_addr_space(pci_device0_t* pci_dev, uint8_t bar);
 
+/* Both these used primarily for Drivers 
+ */
+void en_bus_master(pci_device0_t* pci_dev);
+
+void dis_bus_master(pdi_device0_t* pci_dev);
 #endif
