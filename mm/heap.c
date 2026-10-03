@@ -1,9 +1,12 @@
 #include <stdint.h>
 #include <stddef.h>
-#include "heap.h"
-#include "vmm.h"
-#include "pmm.h"
-#include "kprintf.h"
+
+#include <arch/i386/vmm.h>
+
+#include <mm/heap.h>
+#include <mm/pmm.h>
+
+#include <lib/kprintf.h>
 
 uint32_t heap_start 	= 0xC1000000; 
 uint32_t heap_curr	= 0xC1000000;

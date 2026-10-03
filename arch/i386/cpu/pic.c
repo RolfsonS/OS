@@ -1,6 +1,7 @@
 #include <stdint.h>
-#include "pic.h"
-#include "io.h"
+
+#include <arch/i386/pic.h>
+#include <arch/i386/io.h>
 
 /* Address ports on PIC we use */
 #define PIC1 0x20  // Base address for master PIC

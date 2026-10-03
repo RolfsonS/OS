@@ -2,15 +2,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "gdt.h"
-#include "idt.h"
-#include "terminal.h"
-#include "kprintf.h"
-#include "pmm.h"
-#include "multiboot.h"
-#include "vmm.h"
-#include "pci.h"
-#include "heap.h"
+#include <arch/i386/gdt.h>
+#include <arch/i386/idt.h>
+#include <arch/i386/multiboot.h>
+#include <arch/i386/vmm.h>
+
+#include <drivers/terminal.h>
+#include <drivers/pci.h>
+
+#include <lib/kprintf.h>
+
+#include <mm/pmm.h>
+#include <mm/heap.h>
 
 // Check if the compiler things you are targeting the wrong operating system
 #if defined(__linux__)

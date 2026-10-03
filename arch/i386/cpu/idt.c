@@ -1,9 +1,11 @@
 #include <stdint.h>
 #include <stddef.h>
-#include "pic.h"
-#include "io.h"
-#include "idt.h"
-#include "terminal.h"
+
+#include <arch/i386/pic.h>
+#include <arch/i386/io.h>
+#include <arch/i386/idt.h>
+
+#include <drivers/terminal.h>
 
 /* Static RAM IDT elements. */
 static struct idt interrupt_descriptor_table; 

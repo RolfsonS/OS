@@ -1,9 +1,12 @@
 #include <stddef.h>
 #include <stdint.h>
-#include "pmm.h"
-#include "multiboot.h"
-#include "kprintf.h"
-#include "string.h"
+
+#include <arch/i386/multiboot.h>
+
+#include <mm/pmm.h>
+
+#include <lib/kprintf.h>
+#include <lib/string.h>
 
 #define MAX_PAGES 4096
 

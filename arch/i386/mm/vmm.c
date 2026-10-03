@@ -1,8 +1,11 @@
 #include <stdint.h>
 #include <stddef.h>
-#include "vmm.h"
-#include "pmm.h"
-#include "kprintf.h"
+
+#include <arch/i386/vmm.h>
+
+#include <mm/pmm.h>
+
+#include <lib/kprintf.h>
 
 /* When we acquire physical blocks of RAM, we need to ensure the processor does
  * not PF when dereferencing to set the contents of this memory. This is a known 

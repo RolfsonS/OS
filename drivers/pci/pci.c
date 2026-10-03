@@ -1,10 +1,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "pci.h"
-#include "kprintf.h"
-#include "io.h"
-#include "heap.h"
+#include <drivers/pci.h>
+
+#include <lib/kprintf.h>
+
+#include <arch/i386/io.h>
+
+#include <mm/heap.h>
 
 /* Pointer to PCI enumerated PCI device info on kernel heap. */
 pci_device0_t* pci_device0_info = NULL;
@@ -279,14 +282,14 @@ void en_bus_master(pci_device0_t* pci_dev) {
 	/* Enable Bus Mastering for a PCI Device */
 	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
 	reg_val ^= 0x4;
-	pci_write_reg(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
+	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
 }
 
 void dis_bus_master(pci_device0_t* pci_dev) {
 	/* Disable Bus Mastering for a PCI Device */
 	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
 	reg_val ^= 0x4;
-	pci_write_reg(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
+	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
 }
 
 

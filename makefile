@@ -2,7 +2,7 @@ CC = i686-elf-gcc
 AS = i686-elf-as
 LD = i686-elf-gcc
 
-CFLAGS = -std=gnu99 -ffreestanding -O2 -Wall -Wextra -g
+CFLAGS = -std=gnu99 -ffreestanding -O2 -Wall -Wextra -g -Iinclude
 LDFLAGS = -ffreestanding -O2 -nostdlib
 
 SRCS = arch/i386/boot/boot.s \
@@ -11,10 +11,10 @@ SRCS = arch/i386/boot/boot.s \
        arch/i386/io.c \
        drivers/pci/pci.c drivers/video/terminal.c \
        kernel/kernel.c \
-       lib\kprintf.c lib\string.c \
-       mm\heap.c mm\pmm.c
+       lib/kprintf.c lib/string.c \
+       mm/heap.c mm/pmm.c
 
-LINK = arch/i386/linker.ld
+LINK = arch/i386/boot/linker.ld
 
 OBJS = $(addprefix build/, $(addsuffix .o, $(basename $(SRCS))))
 
