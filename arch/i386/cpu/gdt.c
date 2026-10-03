@@ -1,5 +1,6 @@
 #include <stdint.h>
-#include "gdt.h"
+
+#include <arch/i386/gdt.h>
 
 /* Static RAM GDT elements */ 
 static struct gdt global_descriptor_table;

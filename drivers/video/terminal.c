@@ -1,8 +1,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "terminal.h"
-#include "string.h"
+
+#include <drivers/terminal.h>
+#include <lib/string.h>
 
 /* Global terminal_info used throughout function calls */
 struct terminal_info terminal;

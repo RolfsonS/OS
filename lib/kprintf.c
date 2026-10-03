@@ -2,7 +2,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <limits.h>
-#include "terminal.h"
+
+#include <drivers/terminal.h>
 
 void print_signed_decimal(int32_t);
 void print_unsigned_decimal(uint32_t);

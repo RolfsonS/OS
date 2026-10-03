@@ -1,10 +1,13 @@
 #include <stdint.h>
 #include <stddef.h>
-#include "idt_handlers.h"
-#include "terminal.h"
-#include "pic.h"
-#include "io.h"
-#include "kprintf.h"
+
+#include <arch/i386/idt_handlers.h>
+#include <arch/i386/io.h>
+#include <arch/i386/pic.h>
+
+#include <drivers/terminal.h>
+
+#include <lib/kprintf.h>
 
 
 void general_idt_handler(void){

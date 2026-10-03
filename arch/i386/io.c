@@ -1,5 +1,6 @@
 #include <stdint.h>
-#include "io.h"
+
+#include <arch/i386/io.h>
 
 void outb(uint16_t port, uint8_t val){
 	/* Assembly for writing to an output port */

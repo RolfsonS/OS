@@ -2,66 +2,42 @@ CC = i686-elf-gcc
 AS = i686-elf-as
 LD = i686-elf-gcc
 
-CFLAGS = -std=gnu99 -ffreestanding -O2 -Wall -Wextra -g
+CFLAGS = -std=gnu99 -ffreestanding -O2 -Wall -Wextra -g -Iinclude
 LDFLAGS = -ffreestanding -O2 -nostdlib
 
-OBJS = boot.o gdt.o gdt_setup.o kernel.o io.o pic.o idt.o idt_setup.o terminal.o idt_handlers.o string.o kprintf.o pmm.o vmm.o heap.o pci.o 
+SRCS = arch/i386/boot/boot.s \
+       arch/i386/cpu/gdt.c  arch/i386/cpu/gdt_setup.s arch/i386/cpu/idt.c arch/i386/cpu/idt_handlers.c arch/i386/cpu/idt_setup.s arch/i386/cpu/pic.c \
+       arch/i386/mm/vmm.c \
+       arch/i386/io.c \
+       drivers/pci/pci.c drivers/video/terminal.c \
+       kernel/kernel.c \
+       lib/kprintf.c lib/string.c \
+       mm/heap.c mm/pmm.c
 
-myos.iso: myos 
-	mkdir -p isodir/boot/grub
-	cp myos isodir/boot/myos
-	grub-mkrescue -o myos.iso isodir
+LINK = arch/i386/boot/linker.ld
 
-myos: $(OBJS) linker.ld
-	$(LD) -T linker.ld -o myos $(LDFLAGS) $(OBJS) -lgcc
+OBJS = $(addprefix build/, $(addsuffix .o, $(basename $(SRCS))))
 
-boot.o: boot.s
-	$(AS) boot.s -o boot.o
+build/myos.iso: build/myos 
+	mkdir -p build/isodir/boot/grub
+	cp build/myos build/isodir/boot/myos
+	cp iso/boot/grub/grub.cfg build/isodir/boot/grub/grub.cfg
+	grub-mkrescue -o build/myos.iso build/isodir
 
-gdt_setup.o: gdt_setup.s
-	$(AS) gdt_setup.s -o gdt_setup.o
+build/myos: $(OBJS) $(LINK)
+	$(LD) -T $(LINK) -o build/myos $(LDFLAGS) $(OBJS) -lgcc
 
-gdt.o: gdt.c
-	$(CC) $(CFLAGS) -c gdt.c -o gdt.o
+build/%.o: %.c
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-io.o: io.c
-	$(CC) $(CFLAGS) -c io.c -o io.o
+build/%.o: %.s
+	mkdir -p $(dir $@)
+	$(AS) $< -o $@
 
-pic.o: pic.c
-	$(CC) $(CFLAGS) -c pic.c -o pic.o
-
-idt.o: idt.c
-	$(CC) $(CFLAGS) -c idt.c -o idt.o
-
-idt_setup.o: idt_setup.s
-	$(AS) idt_setup.s -o idt_setup.o
-
-kernel.o: kernel.c
-	$(CC) $(CFLAGS) -c kernel.c -o kernel.o
-
-pmm.o: pmm.c
-	$(CC) $(CFLAGS) -c pmm.c -o pmm.o
-
-terminal.o: terminal.c
-	$(CC) $(CFLAGS) -c terminal.c -o terminal.o
-
-idt_handlers.o: idt_handlers.c
-	$(CC) $(CFLAGS) -c idt_handlers.c -o idt_handlers.o
-
-string.o: string.c
-	$(CC) $(CFLAGS) -c string.c -o string.o
-
-kprint.o: kprintf.c
-	$(CC) $(CFLAGS) -c kprintf.c -o kprintf.o
-
-vmm.o: vmm.c
-	$(CC) $(CFLAGS) -c vmm.c -o vmm.o
-
-heap.o: heap.c
-	$(CC) $(CFLAGS) -c heap.c -o heap.o
-
-pci.o: pci.c
-	$(CC) $(CFLAGS) -c pci.c -o pci.o
+run: build/myos
+	qemu-system-i386 -cdrom build/myos.iso 
 
 clean:
-	rm -f *.o myos myos.iso
+	rm -rf build
+

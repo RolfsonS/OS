@@ -1,7 +1,7 @@
 #ifndef PMM_H
 #define PMM_H
 
-#include "multiboot.h"
+#include <arch/i386/multiboot.h>
 
 /* Initializes the physical memory mapping, which is passed to us via the bootloader.
  * For more info, see https://www.gnu.org/software/grub/manual/multiboot/multiboot.html
