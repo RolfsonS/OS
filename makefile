@@ -9,7 +9,7 @@ SRCS = arch/i386/boot/boot.s \
        arch/i386/cpu/gdt.c  arch/i386/cpu/gdt_setup.s arch/i386/cpu/idt.c arch/i386/cpu/idt_handlers.c arch/i386/cpu/idt_setup.s arch/i386/cpu/pic.c \
        arch/i386/mm/vmm.c \
        arch/i386/io.c \
-       drivers/pci/pci.c drivers/video/terminal.c \
+       drivers/pci/pci.c drivers/video/terminal.c drivers/net/e1000.c\
        kernel/kernel.c \
        lib/kprintf.c lib/string.c \
        mm/heap.c mm/pmm.c
@@ -35,7 +35,7 @@ build/%.o: %.s
 	mkdir -p $(dir $@)
 	$(AS) $< -o $@
 
-run: build/myos
+run: build/myos.iso
 	qemu-system-i386 -cdrom build/myos.iso 
 
 clean:

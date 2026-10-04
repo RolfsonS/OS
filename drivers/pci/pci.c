@@ -14,21 +14,8 @@ pci_device0_t* pci_device0_info = NULL;
 
 void init_pci() {
 	/* Brute forcing PCI space sets up PCI device list and certain BAR information.
-	 * However, we still need to determine the amount of address space taken by the BAR.
-	 * This is done in the proceeding function call. 
 	 */
 	brute_force_pci();
-
-	pci_device0_t* test = pci_device0_info;
-	
-	uint8_t iter = 0;
-	while(test) {
-		if(iter == 4 || iter == 5) { 
-			print_dev_info(test);
-		}
-		iter++;
-		test = test -> next;
-	} 
 }
 
 uint32_t pci_reg_read(uint8_t bus, uint8_t device, uint8_t func, uint8_t reg) {
@@ -291,9 +278,3 @@ void dis_bus_master(pci_device0_t* pci_dev) {
 	reg_val ^= 0x4;
 	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
 }
-
-
-
-
-
-

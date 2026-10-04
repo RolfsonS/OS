@@ -31,8 +31,10 @@ void* kmalloc(size_t size) {
 
 
 
-void free(void* loc) {	
+void free(uint32_t* loc) {	
 	// Doing nothing rn lol
+	//
+	*loc = 0x0;
 }
 
 

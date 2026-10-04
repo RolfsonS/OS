@@ -9,6 +9,7 @@
 
 #include <drivers/terminal.h>
 #include <drivers/pci.h>
+#include <drivers/e1000.h>
 
 #include <lib/kprintf.h>
 
@@ -53,6 +54,8 @@ void kernel_main(multiboot_info_t* mbd, uint32_t magic) {
 
 	init_heap();
 	init_pci();
+
+	test();
 
 	while(1){};
 }
