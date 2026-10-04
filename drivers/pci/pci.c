@@ -10,7 +10,14 @@
 #include <mm/heap.h>
 
 /* Pointer to PCI enumerated PCI device info on kernel heap. */
-pci_device0_t* pci_device0_info = NULL;
+static pci_device0_t* pci_device0_info = NULL;
+
+/* Extern Declarations of pci_driver_t structs, used for loading drivers */
+extern pci_driver_t e1000_driver;
+
+/* Array of PCI drivers.
+ * Will need to change this in the future, do not want to add every device manually here. */
+pci_driver_t* drivers[] = {&e1000_driver};
 
 
 
@@ -276,13 +283,33 @@ static void brute_force_pci() {
 	}
 }
 
+/* For a specific PCI device, if we find a match, call probe for that driver */
+static void load_pci_drivers(pci_device0_t* pci_dev) {
+	uint16_t device_id = pci_dev -> device_id;
+	uint16_t vendor_id = pci_dev -> vendor_id;
+	size_t arr_size	   = (sizeof(drivers)) / (sizeof(pci_driver_t*));
 
+	/* Iterate through devices. */
+	for(size_t index = 0; index < arr_size; index++) {
+		pci_driver_t* driver = drivers[index];
+		if(driver -> info[0] == device_id &&
+		   driver -> info[1] == vendor_id) {
+			driver -> probe(pci_dev);
+		}
+	}
+}
 
 /* Functions availabe via pci.h. Publically accessible. */
 void init_pci() {
 	/* Brute forcing PCI space sets up PCI device list and certain BAR information.
 	 */
 	brute_force_pci();
+	pci_device0_t* dev = pci_device0_info;
+	
+	while(dev != NULL) {
+		load_pci_drivers(dev);
+		dev = dev -> next;
+	}
 }
 
 void en_bus_master(pci_device0_t* pci_dev) {
