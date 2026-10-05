@@ -25,26 +25,46 @@ extern uint32_t boot_page_table1[1024];
 uint32_t* kernel_pd = (uint32_t*)&boot_page_directory;
 uint32_t* kernel_pt = (uint32_t*)&boot_page_table1;
 
-uint32_t create_pde(uint32_t addr, uint32_t flags) {
+
+
+
+/* Lower helper functions, declared static. 
+ * Interface should only contain methods to Map/Unmap a page, 
+ * preferably via kmalloc (if no direct mapping is required).
+ */
+
+/* Creates a page directory entry */
+static uint32_t create_pde(uint32_t addr, uint32_t flags) {
 	return (addr | flags);
 }
 
-uint32_t create_pte(uint32_t addr, uint32_t flags) {
+/* Creates a page table entry */
+static uint32_t create_pte(uint32_t addr, uint32_t flags) {
 	return (addr | flags);
 }
 
-uint32_t return_addr(uint32_t table_entry) {
+/* Returns the address of a PDE or PTE */
+static uint32_t return_addr(uint32_t table_entry) {
 	return table_entry & 0xFFFFF000;
 }
 
+/* Invalidates a TLB entry based on virtual address */
 static inline void invlpg(uint32_t vaddr) {
     __asm__ volatile ("invlpg (%0)" : : "r"(vaddr) : "memory");
 }
 
-void map_known(uint32_t phy) {
+/* Maps known entry to a physical location, meaning we can modify physical
+ * memory using a known translation */
+static void map_known(uint32_t phy) {
 	boot_page_table1[1022] = create_pte(phy, P | RW);
 	invlpg(kvaddr);
 }
+
+
+
+/* Heavy lifters for VMM. See include/arch/i386/vmm.h 
+ *
+ */
 
 void map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags) {
 	// Locate indexes to PD and PTs
@@ -111,4 +131,8 @@ void unmap_page(uint32_t v_addr) {
 	*known = create_pte(0x0, NP);
 
 	// Add scan for full set of PTE, so we can free this 4k block 
+}
+
+void massive_map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags, uint32_t size) {
+	// Add stuff for iterating through all size 
 }

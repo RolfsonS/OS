@@ -45,42 +45,6 @@
 #define PAT_PTE 	(0x1 << 7)
 #define NPAT_PTE 	0x0
 
-
-
-/* Creates a page directory entry in a page directory.
- *
- * Param: uint32_t addr, The physical address of the Page Table.
- * Param: uint32_t flags, The flags set in the lower half of this PD entry.
- *
- * Returns: uint32_t, a created Page Directory Entry
- */
-uint32_t create_pde(uint32_t addr, uint32_t flags);
-
-/* Creates a page table entry in a page directory.
- *
- * Param: uint32_t addr, The physical address of the PHYSICAL PAGE.
- * Param: uint32_t flags, The flags set in the lower half of this PT entry.
- *
- * Returns: uint32_t, a created Page Table Entry
- */
-uint32_t create_pte(uint32_t addr, uint32_t flags);
-
-/* Returns the first 20 bits of a page directory or table entry, thus,
- * where the next "walk" is located in memory.
- *
- * Param: uint32_t table_entry, the full table entry
- *
- * Returns: uint32_t, physical address of next entry in walk
- */
-uint32_t return_addr(uint32_t table_entry);
-
-/* Maps a physical address to a known virtual address.
- * Translation is known. Only change entry of the final PTE
- *
- * Param: uint32_t p_addr, the physical address to map
- */
-void map_known(uint32_t p_addr);
-
 /* Maps a virtual address to a physical address ("Allocates a page"). 
  *
  * Param: uint32_t v_addr, the virtual address to map
@@ -94,4 +58,15 @@ void map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags);
  * Param: uint32_t v_addr, the virtual address to unmap
  */
 void unmap_page(uint32_t v_addr);
+
+/* Acts as a wrapper for map_page.
+ * Typically used for MMIO access mappings, where calling a map_page 
+ * a bunch of times would be largely impractical.
+ *
+ * Param: uint32_t v_addr, Virtual address to map
+ * Param: uint32_t p_addr, Physical address to map
+ * Param: uint32_t flags, Flags to apply to Pages
+ * Param: uint32_t size, Size to allocate (must be 4k aligned)
+ */
+void massive_map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags, uint32_t size);
 #endif

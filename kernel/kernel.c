@@ -37,25 +37,10 @@ void kernel_main(multiboot_info_t* mbd, uint32_t magic) {
 	mbd = (multiboot_info_t*)((uint32_t)mbd + 0xC0000000);
 	pmm_init(mbd, magic);
 	
-//	for(size_t i = 0; i < 5; i++){
-//		allocate_page();
-//	}
-
-//	map_page(0x0, 0x0, 0x0);
-//	map_page(0x0, 0x0, 0x0);
-
-//	map_page(0x400000, (uint32_t)allocate_page(), 0x1);
-//	map_page(0x400000, 0x0, 0x0);
-	
-//	map_page(0x401000, (uint32_t)allocate_page(), 0x1);
-//	map_page(0x401000, 0x0, 0x0);
-
-//	map_page(0xC03FE000, 0x0, 0x0);
 
 	init_heap();
 	init_pci();
 
-	test();
 
 	while(1){};
 }
