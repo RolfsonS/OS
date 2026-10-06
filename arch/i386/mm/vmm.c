@@ -134,5 +134,16 @@ void unmap_page(uint32_t v_addr) {
 }
 
 void massive_map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags, uint32_t size) {
-	// Add stuff for iterating through all size 
+	uint32_t num_of_page = size / 0x1000;
+	
+	/* Iterate through, creating pages memory mapped pages */
+	for(size_t page = 0; page < num_of_page; page++) {
+		map_page(v_addr, p_addr, flags);
+		v_addr += 0x1000;
+		p_addr += 0x1000;
+	}
 }
+
+
+
+

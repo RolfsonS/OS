@@ -57,4 +57,9 @@
 /* Transmit Descriptor Tail */
 #define TDT 0x3818
 
+/* Receive Address Low */
+#define RAL 0x5400
+
+/* Receive Address High */
+#define RAH 0x5404
 #endif 
