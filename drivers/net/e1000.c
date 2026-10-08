@@ -11,6 +11,11 @@
 #include <lib/kprintf.h>
 #include <lib/string.h>
 
+#define RX_DESCRIPTOR_BUFFER_SIZE 	0x1000
+#define RX_DESCRIPTORS 			0x8
+
+
+
 /* Single forward definition for e1000 driver. Needed for struct definition. */
 static void e1000_probe(pci_device0_t* pci_dev);
 
@@ -27,6 +32,15 @@ pci_driver_t e1000_driver = {
 /* Virtual MMIO Address */ 
 static uint32_t MMIO_LOC = 0xD000000;
 
+/* Struct for a receive descriptor. This expects a 64-bit address,
+ * we just set the high bits to 0x0. */
+typedef struct rx_descriptor_s {
+	uint32_t addr_high, addr_low;
+	uint16_t special, length, checksum;
+	uint8_t error, status;
+} rx_descriptor_t;
+
+rx_descriptor_t* rx_ring = NULL;
 
 /* Correctly set up MMIO paging. 
  * Page permissions are set read/write, present, and not cacheable.
@@ -78,6 +92,18 @@ static void init_control(void) {
 	write_reg(CTRL, control);
 }
 
+/* Intialization of receive descriptor and relevant registers */
+static void init_receive_descriptor() {
+	/* Allocate heap memory to the rx_ring. */
+	rx_ring = (rx_descriptor_t*) kmalloc(RX_DESCRIPTORS * sizeof(rx_descriptor_t));
+	
+	/* How to get the address? */
+	for (size_t descriptor = 0; descriptor < RX_DESCRIPTORS; descriptor++) {
+		rx_descriptor_t* curr_descriptor = rx_ring + descriptor;
+		*curr_descriptor = (rx_descriptor_t) ;
+	}
+}
+
 /* Set up receive components of the NIC */
 static void init_receive(void) {
 	/* For a real peice of NIC hardware, you may have to read the MAC 
@@ -89,8 +115,7 @@ static void init_receive(void) {
 		write_reg((MTA + (reg * 0x4)), 0x0);
 	}	
 
-		
-
+	init_receive_descriptor();
 }
 
 
