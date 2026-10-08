@@ -25,6 +25,9 @@ typedef struct pci_device0_s {
 	uint16_t device_id, vendor_id;
 	uint8_t class_code, subclass, prog_if, revision_id;
 	bar_t bars[6];
+	
+	/* Interrupt Pin and Line Information */
+	uint8_t interrupt_pin, interrupt_line;
 
 	/* Points to next PCI device */
 	struct pci_device0_s* next;

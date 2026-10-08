@@ -74,6 +74,9 @@
 /* Flow Control Transmit Timer Value */
 #define FCCTV 	0x170
 
+/* Multicast Table Array */
+#define MTA	0x5200
+
 /* ---------- Relevant Device Register Bits -------- */
 #define CTRL_ASDE 	0x10
 #define CTRL_SLU  	0x20

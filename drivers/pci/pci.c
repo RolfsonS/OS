@@ -85,6 +85,13 @@ static uint8_t pci_revision_id(uint32_t pci_reg) {
 	return (uint8_t) pci_reg;
 }
 
+static uint8_t pci_interrupt_pin(uint32_t pci_reg) {
+	return (uint8_t) (pci_reg >> 8);
+}
+
+static uint8_t pci_interrupt_line(uint32_t pci_reg) {
+	return (uint8_t) pci_reg;
+}
 
 
 
@@ -196,6 +203,7 @@ static void add_dev_info(uint8_t bus, uint8_t device, uint8_t func, pci_device0_
 	/* All relevant register reads. */
 	uint32_t reg_0x0	= pci_reg_read(bus, device, func, 0x0);
 	uint32_t reg_0x8	= pci_reg_read(bus, device, func, 0x8);
+	uint32_t reg_0x3C 	= pci_reg_read(bus, device, func, 0x3C);
 
 	/* All relevant fields extracted from register reads. */
 	uint16_t dev_id 	= pci_device_id(reg_0x0);
@@ -205,6 +213,9 @@ static void add_dev_info(uint8_t bus, uint8_t device, uint8_t func, pci_device0_
 	uint8_t subclass	= pci_subclass(reg_0x8);
 	uint8_t prog_if		= pci_prog_if(reg_0x8);
 	uint8_t revision_id	= pci_revision_id(reg_0x8);
+
+	uint8_t interrupt_pin 	= pci_interrupt_pin(reg_0x3C);
+	uint8_t interrupt_line 	= pci_interrupt_line(reg_0x3C);
 
 	/* Relevant struct assignments */
 	pci_dev -> device 	= device;
@@ -218,6 +229,9 @@ static void add_dev_info(uint8_t bus, uint8_t device, uint8_t func, pci_device0_
 	pci_dev -> subclass	= subclass;
 	pci_dev -> prog_if	= prog_if;
 	pci_dev -> revision_id 	= revision_id;
+	
+	pci_dev -> interrupt_pin = interrupt_pin;
+	pci_dev -> interrupt_line = interrupt_line;
 
 	/* Configure the base address registers of the device */
 	config_bars(bus, device, func, pci_dev);
@@ -330,6 +344,7 @@ void print_dev_info(pci_device0_t* pci_dev) {
 	kprintf("Bus: %x, Device: %x, Function: %x\n", pci_dev -> bus, pci_dev -> device, pci_dev -> function);
 	kprintf("Dev_ID: %x, Vendor: %x \n", pci_dev -> device_id, pci_dev -> vendor_id);
 	kprintf("CC: %x, SC: %x, PROGIF: %x, REV: %x \n", pci_dev -> class_code, pci_dev -> subclass, pci_dev -> prog_if, pci_dev -> revision_id);
+	kprintf("PIN: %x, LINE: %x\n", pci_dev -> interrupt_pin, pci_dev -> interrupt_line);
 
 	/* Print BAR info for the device aswell */
 	print_bars(pci_dev);

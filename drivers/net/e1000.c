@@ -74,12 +74,26 @@ static void init_control(void) {
 	write_reg(FCT, 0x0);
 	write_reg(FCCTV, 0x0);
 
+	/* Write all updated values to the register */
 	write_reg(CTRL, control);
-	control = read_reg(CTRL);
-	kprintf("CTRL: %x\n", control);
 }
 
-static void init_receive(voidf;)
+/* Set up receive components of the NIC */
+static void init_receive(void) {
+	/* For a real peice of NIC hardware, you may have to read the MAC 
+	 * address from EEPROM, and write it to RAL/RAH. For this NIC, we 
+	 * just read directly from these registers... just a step to be aware of */
+
+	/* Initialize the Multicast Table Array to all 0's (128 4 Byte Registers)*/
+	for (size_t reg = 0; reg < 128; reg++) {
+		write_reg((MTA + (reg * 0x4)), 0x0);
+	}	
+
+		
+
+}
+
+
 static void e1000_probe(pci_device0_t* pci_dev) {
 	print_dev_info(pci_dev);
 	kprintf("Loading e1000 driver... \n");
