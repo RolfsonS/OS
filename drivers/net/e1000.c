@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 #include <drivers/e1000.h>
 #include <drivers/pci.h>
@@ -10,6 +11,9 @@
 
 #include <lib/kprintf.h>
 #include <lib/string.h>
+
+#include <mm/pmm.h>
+#include <mm/heap.h>
 
 #define RX_DESCRIPTOR_BUFFER_SIZE 	0x1000
 #define RX_DESCRIPTORS 			0x8
@@ -72,7 +76,6 @@ static void set_MAC_addr(void) {
 static void init_control(void) {
 	/* Auto negotiate speed and duplex */
 	uint32_t control = read_reg(CTRL);
-	kprintf("CTRL: %x\n", control);
 	control |= CTRL_ASDE | CTRL_SLU;
 
 	/* No PHY Reset, No Invert Active Low Signal.
@@ -93,14 +96,37 @@ static void init_control(void) {
 }
 
 /* Intialization of receive descriptor and relevant registers */
-static void init_receive_descriptor() {
+static void init_receive_descriptors() {
+	/* This is cheating to get a 16-byte aligned address */
+	uint32_t mem = (uint32_t) kmalloc(0x1);
+	while ((mem & 0xF) != 0xF) mem = (uint32_t) kmalloc(0x1); 
+
 	/* Allocate heap memory to the rx_ring. */
 	rx_ring = (rx_descriptor_t*) kmalloc(RX_DESCRIPTORS * sizeof(rx_descriptor_t));
-	
-	/* How to get the address? */
+
+	/* Iterate through all of the descriptors we want to create*/
 	for (size_t descriptor = 0; descriptor < RX_DESCRIPTORS; descriptor++) {
 		rx_descriptor_t* curr_descriptor = rx_ring + descriptor;
-		*curr_descriptor = (rx_descriptor_t) ;
+
+		/* Set High Address to 0, and Low Address to a physical memory location */
+		curr_descriptor -> addr_high = 0x0;
+		curr_descriptor -> addr_low  = (uint32_t) allocate_page();
+
+		/* Reset all other fields */
+		curr_descriptor -> special = 0x0;
+		curr_descriptor -> length = 0x0;
+		curr_descriptor -> checksum = 0x0;
+		curr_descriptor -> error = 0x0;
+		curr_descriptor -> status = 0x0;
+	}
+	
+	/* Set relevant Receive Registers */
+
+	for (size_t descriptor = 0; descriptor < 1; descriptor++) {
+		rx_descriptor_t* c = rx_ring + descriptor;
+		kprintf("RX_RNG: %x\n", c);
+		uint32_t rx_ring_phy = walk(c);
+		kprintf("RX_RNG_PHY: %x\n ", rx_ring_phy);
 	}
 }
 
@@ -113,24 +139,26 @@ static void init_receive(void) {
 	/* Initialize the Multicast Table Array to all 0's (128 4 Byte Registers)*/
 	for (size_t reg = 0; reg < 128; reg++) {
 		write_reg((MTA + (reg * 0x4)), 0x0);
-	}	
-
-	init_receive_descriptor();
+	}
+	
+	init_receive_descriptors();
 }
 
 
 static void e1000_probe(pci_device0_t* pci_dev) {
-	print_dev_info(pci_dev);
-	kprintf("Loading e1000 driver... \n");
+	//print_dev_info(pci_dev);
+	//kprintf("Loading e1000 driver... \n");
 	
 	set_MMIO(pci_dev);
-	kprintf("MMIO: %x \n", MMIO_LOC);
+	//kprintf("MMIO: %x \n", MMIO_LOC);
 	
 	set_MAC_addr();
 
 	init_control();
-
+	
+	//kprintf("test");
 	init_receive();
+	kprintf("test");
 }
 
 

@@ -69,4 +69,6 @@ void unmap_page(uint32_t v_addr);
  * Param: uint32_t size, Size to allocate (must be 4k aligned)
  */
 void massive_map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags, uint32_t size);
+
+uint32_t walk(uint32_t v_addr);
 #endif

@@ -67,12 +67,12 @@ static void map_known(uint32_t phy) {
  */
 
 void map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags) {
-	// Locate indexes to PD and PTs
+	/* Locate indexes to PD and PTs */
 	uint32_t page_dir 	= v_addr / 0x400000;
 	uint32_t page_table 	= (v_addr % 0x400000) / 0x1000;
-	uint32_t* known_addr	= (uint32_t*)kvaddr;
+	uint32_t* known_addr	= (uint32_t*) kvaddr;
 
-	// Obtain the PDE at that entry, check present bit
+	/* Obtain the PDE at that entry, check present bit */
 	uint32_t pde = kernel_pd[page_dir];
 
 	if(!(pde & 0x1)) {
@@ -115,7 +115,7 @@ void map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags) {
 void unmap_page(uint32_t v_addr) {
 	uint32_t page_dir 	= v_addr / 0x400000;
 	uint32_t page_table  	= (v_addr % 0x400000) / 0x1000;
-	uint32_t* known 	= (uint32_t*)kvaddr;
+	uint32_t* known 	= (uint32_t*) kvaddr;
 
 	/* Access the Page Directory entry, extract the phy mem address */
 	uint32_t page_dir_entry = kernel_pd[page_dir];
@@ -144,6 +144,25 @@ void massive_map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags, uint32_t
 	}
 }
 
+uint32_t walk(uint32_t v_addr) {
+	/* Walks Pages to find the correct physical address. */
+	uint32_t page_dir 	= v_addr / 0x400000;
+	uint32_t page_table 	= (v_addr % 0x400000) / 0x1000;
+	uint32_t* known 	= (uint32_t*) kvaddr;
 
+	/* Find the lcation of the page directory entry.
+	 * Using this, extract the physical address of the page table. */
+	uint32_t page_dir_entry = kernel_pd[page_dir];
+	uint32_t pt_loc 	= return_addr(page_dir_entry);
+	kprintf("PT_LOC: %x", pt_loc);
+
+	/* Map this to the known address, and repeat the above process. */
+	map_known(pt_loc);
+	known += page_table;
+	uint32_t phy_loc = return_addr(*known);
+	kprintf("INSIZE: %x \n", *known);
+	/* Return this physical address PLUS the physical offset. */
+	return (phy_loc + (v_addr % 0x1000));
+}
 
 

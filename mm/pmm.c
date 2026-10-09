@@ -105,7 +105,7 @@ void print_byte(uint32_t memory_loc) {
 	uint32_t entry_byte = memory_loc / 0x8000;
 	uint32_t entry_bit = (memory_loc / 0x1000) % 0x8;
 	 
-	kprintf("Entry Byte: %u, Entry bit: %u \n", entry_byte, entry_bit);
+	kprintf("\nEntry Byte: %u, Entry bit: %u \n", entry_byte, entry_bit);
 	kprintf("Updated Bitmap Location: %b \n", bitmap[entry_byte]);
 }
 
@@ -117,23 +117,28 @@ uint32_t find_nearest_page(uint32_t curr_addr) {
 	return curr_addr;
 }
 
+
+/* Additional Comments added 10/8/2026 -- Hard to Understand */
 void* allocate_page(void) {
-	/* Iterate through all possible pages, checking for next empty slot */
+	/* Iterate through all possible pages, checking for next empty slot. */
 	size_t curr_byte = 0;
+
+	/* Iterate through all possible pages, with each bit representing a physical page (frame) */
 	while(curr_byte < MAX_PAGES) {
-		/* Each bit is a page */
 		uint8_t count = 0;
-		for(size_t curr_bit = 7; curr_bit > 0; curr_bit--) {
-			if((bitmap[curr_byte] >> curr_bit) && 0x1) {
+		
+		/* Bug was in this for loop. Was using size_t, but this wraps around, and never goes negative! */
+		for(int8_t curr_bit = 7; curr_bit >= 0; curr_bit--) {
+			if((bitmap[curr_byte] >> curr_bit) & 0x1) {
 				uint32_t memory_loc = (curr_byte * 0x8000) + (count * 0x1000);
 				uint32_t* allocated = allocate_pmm(memory_loc);
-//				kprintf("Phy mem allocated: %x\n", allocated);
 				return allocated;
 			}	
 			count++;
 		}
+		curr_byte++;
 	}
-//	kprintf("Broken");
+
 	/* Nothing is found */
 	return NULL;
 }
