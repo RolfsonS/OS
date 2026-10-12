@@ -154,13 +154,12 @@ uint32_t walk(uint32_t v_addr) {
 	 * Using this, extract the physical address of the page table. */
 	uint32_t page_dir_entry = kernel_pd[page_dir];
 	uint32_t pt_loc 	= return_addr(page_dir_entry);
-	kprintf("PT_LOC: %x", pt_loc);
 
 	/* Map this to the known address, and repeat the above process. */
 	map_known(pt_loc);
 	known += page_table;
 	uint32_t phy_loc = return_addr(*known);
-	kprintf("INSIZE: %x \n", *known);
+
 	/* Return this physical address PLUS the physical offset. */
 	return (phy_loc + (v_addr % 0x1000));
 }

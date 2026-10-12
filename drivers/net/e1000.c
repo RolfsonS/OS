@@ -15,10 +15,15 @@
 #include <mm/pmm.h>
 #include <mm/heap.h>
 
+/* Values specifying th size of the receive buffer and how many descriptors we use in the ring.
+ * It should be noted that 4096 B was choosen so we can easily allocate a slab of physical memory
+ */
 #define RX_DESCRIPTOR_BUFFER_SIZE 	0x1000
 #define RX_DESCRIPTORS 			0x8
 
-
+/* Redefinition of known virtual address (See vmm.c). 
+ * Allows us to alter content of known RAM memory, used for accessing buffers. */
+#define kvaddr 0xC03FE000
 
 /* Single forward definition for e1000 driver. Needed for struct definition. */
 static void e1000_probe(pci_device0_t* pci_dev);
@@ -119,15 +124,6 @@ static void init_receive_descriptors() {
 		curr_descriptor -> error = 0x0;
 		curr_descriptor -> status = 0x0;
 	}
-	
-	/* Set relevant Receive Registers */
-
-	for (size_t descriptor = 0; descriptor < 1; descriptor++) {
-		rx_descriptor_t* c = rx_ring + descriptor;
-		kprintf("RX_RNG: %x\n", c);
-		uint32_t rx_ring_phy = walk(c);
-		kprintf("RX_RNG_PHY: %x\n ", rx_ring_phy);
-	}
 }
 
 /* Set up receive components of the NIC */
@@ -141,7 +137,40 @@ static void init_receive(void) {
 		write_reg((MTA + (reg * 0x4)), 0x0);
 	}
 	
+	/* Initialize descriptors */
 	init_receive_descriptors();
+
+	/* Set relevant Receive Registers.
+	 * First, we set Receive Descriptor Mem Loc Regs */
+	uint32_t rd_phy_addr = walk((uint32_t) rx_ring);
+	write_reg(RDBAH, 0x0);
+	write_reg(RDBAL, rd_phy_addr);
+	
+	/* Set Receive Decscriptor Length in bytes! */
+	write_reg(RDLEN, RX_DESCRIPTORS * sizeof(rx_descriptor_t));
+
+	/* Init Receive Descriptor head and tail. */
+	write_reg(RDH, 0x0);
+	write_reg(RDT, RX_DESCRIPTORS - 1);
+
+	/* Init Receive Control Register */
+	uint32_t receive_ctrl = read_reg(RCTL);
+
+	/* Enable normal operation, no long packets, no loopback. */
+	receive_ctrl |= RCTL_EN;
+	receive_ctrl &= ((~RCTL_LPE) | (~RCTL_LMB));
+
+	/* Free buffer 1/4 of RDLEN, leave default multicast. */
+	receive_ctrl |= RCTL_RDMTS_L;
+	receive_ctrl &= ~RCTL_RDMTS_H;
+	receive_ctrl &= ~RCTL_MO;
+
+	/* Enable broadcast accept, and configure receive buffer size. */
+	receive_ctrl |= RCTL_BAM;
+	receive_ctrl |= RCTL_BSIZE_L | RCTL_BSIZE_H | RCTL_BSEX;
+	
+	/* Stip Ethernet CRC */
+	receive_ctrl |= RCTL_SECRC; 
 }
 
 
@@ -158,7 +187,6 @@ static void e1000_probe(pci_device0_t* pci_dev) {
 	
 	//kprintf("test");
 	init_receive();
-	kprintf("test");
 }
 
 

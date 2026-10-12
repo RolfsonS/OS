@@ -84,8 +84,17 @@
 #define CTRL_ILOS 	0x80
 #define CTRL_VME	0x40000000
 
-
-
+#define RCTL_EN		0x2
+#define RCTL_LPE	0x20
+#define RCTL_LMB	0xC0
+#define RCTL_RDMTS_L 	0x100
+#define RCTL_RDMTS_H	0x200
+#define RCTL_MO 	0x3000
+#define RCTL_BAM 	0x8000
+#define RCTL_BSIZE_L	0x10000
+#define RCTL_BSIZE_H	0x20000
+#define RCTL_BSEX 	0x2000000
+#define RCTL_SECRC 	0x4000000
 
 
 
