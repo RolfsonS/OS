@@ -96,7 +96,10 @@
 #define RCTL_BSEX 	0x2000000
 #define RCTL_SECRC 	0x4000000
 
-
+#define TCTL_EN 	0x2
+#define TCTL_PSP	0x8
+#define TCTL_CT 	0xF0
+#define TCTL_COLD 	0x40000
 
 #endif 
 

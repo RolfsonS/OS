@@ -20,6 +20,8 @@
  */
 #define RX_DESCRIPTOR_BUFFER_SIZE 	0x1000
 #define RX_DESCRIPTORS 			0x8
+#define TX_DESCRIPTOR_BUFFER_SIZE 	0x1000
+#define TX_DESCRIPTORS			0x8
 
 /* Redefinition of known virtual address (See vmm.c). 
  * Allows us to alter content of known RAM memory, used for accessing buffers. */
@@ -49,7 +51,15 @@ typedef struct rx_descriptor_s {
 	uint8_t error, status;
 } rx_descriptor_t;
 
+/* Struct for transmit descriptor (Legacy). */
+typedef struct tx_descriptor_s {
+	uint32_t addr_high, addr_low;
+	uint16_t special, length;
+	uint8_t  css, sta, cmd, cso;
+} tx_descriptor_t;
+
 rx_descriptor_t* rx_ring = NULL;
+tx_descriptor_t* tx_ring = NULL;
 
 /* Correctly set up MMIO paging. 
  * Page permissions are set read/write, present, and not cacheable.
@@ -100,8 +110,8 @@ static void init_control(void) {
 	write_reg(CTRL, control);
 }
 
-/* Intialization of receive descriptor and relevant registers */
-static void init_receive_descriptors() {
+/* Intialization of receive descriptors and relevant registers */
+static void init_receive_descriptors(void) {
 	/* This is cheating to get a 16-byte aligned address */
 	uint32_t mem = (uint32_t) kmalloc(0x1);
 	while ((mem & 0xF) != 0xF) mem = (uint32_t) kmalloc(0x1); 
@@ -124,6 +134,33 @@ static void init_receive_descriptors() {
 		curr_descriptor -> error = 0x0;
 		curr_descriptor -> status = 0x0;
 	}
+}
+
+/* Intialization of transmit descriptors and relevant registers */
+static void init_transmit_descriptors(void) {
+	/* This is cheating to get a 16-byte aligned address */
+	uint32_t mem = (uint32_t) kmalloc(0x1);
+	while ((mem & 0xF) != 0xF) mem = (uint32_t) kmalloc(0x1); 
+	
+	/* Allocate heap memory to the tx_ring. */
+	tx_ring = (tx_descriptor_t*) kmalloc(TX_DESCRIPTORS * sizeof(tx_descriptor_t));
+
+	/* Iterate through all of the descriptors we want to create*/
+	for (size_t descriptor = 0; descriptor < TX_DESCRIPTORS; descriptor++) {
+		tx_descriptor_t* curr_descriptor = tx_ring + descriptor;
+
+		/* Set High Address to 0, and Low Address to a physical memory location */
+		curr_descriptor -> addr_high = 0x0;
+		curr_descriptor -> addr_low  = (uint32_t) allocate_page();
+
+		/* Reset all other fields */
+		curr_descriptor -> special = 0x0;
+		curr_descriptor -> length = 0x0;
+		curr_descriptor -> css = 0x0;
+		curr_descriptor -> sta = 0x0;
+		curr_descriptor -> cmd = 0x0;
+		curr_descriptor -> cso = 0x0;
+	} 
 }
 
 /* Set up receive components of the NIC */
@@ -170,23 +207,50 @@ static void init_receive(void) {
 	receive_ctrl |= RCTL_BSIZE_L | RCTL_BSIZE_H | RCTL_BSEX;
 	
 	/* Stip Ethernet CRC */
-	receive_ctrl |= RCTL_SECRC; 
+	receive_ctrl |= RCTL_SECRC;
+
+	/* Write value back. */
+	write_reg(RCTL, receive_ctrl);
 }
 
+/* Set up receive components of the NIC. */
+static void init_transmit(void) {
+	/* Initialize the ring */
+	init_transmit_descriptors();
+	
+	/* Load High and Low base address registers */
+	uint32_t td_phy_addr = walk((uint32_t) tx_ring);
+	write_reg(TDBAH, 0x0);
+	write_reg(TDBAL, td_phy_addr);
+	
+	/* Load the size of the tx ring */
+	write_reg(TDLEN, TX_DESCRIPTORS * sizeof(tx_descriptor_t));
+
+	/* Reset transmit descriptor head and tail. */
+	write_reg(TDH, 0x0);
+	write_reg(TDT, 0x0);
+
+	/* Set relevant transmit control registers. 
+	 * First, enable and pad short packets */
+	uint32_t transmit_ctrl = read_reg(TCTL);
+	transmit_ctrl |= TCTL_EN | TCTL_PSP;
+
+	/* Set collision threshold and distance, although they are not used
+	 * in full duplex */
+	transmit_ctrl |= TCTL_CT | TCTL_COLD;
+
+	/* Write value back to reg */
+	write_reg(TCTL, transmit_ctrl);
+}
 
 static void e1000_probe(pci_device0_t* pci_dev) {
-	//print_dev_info(pci_dev);
-	//kprintf("Loading e1000 driver... \n");
 	
+	/* Initialize the device */
 	set_MMIO(pci_dev);
-	//kprintf("MMIO: %x \n", MMIO_LOC);
-	
 	set_MAC_addr();
-
 	init_control();
-	
-	//kprintf("test");
 	init_receive();
+	init_transmit();
 }
 
 
