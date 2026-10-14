@@ -46,16 +46,25 @@ static uint32_t MMIO_LOC = 0xD000000;
 /* Struct for a receive descriptor. This expects a 64-bit address,
  * we just set the high bits to 0x0. */
 typedef struct rx_descriptor_s {
-	uint32_t addr_high, addr_low;
-	uint16_t special, length, checksum;
-	uint8_t error, status;
-} rx_descriptor_t;
+	uint32_t addr_low;
+	uint32_t addr_high;
+	uint16_t length; 
+	uint16_t checksum;
+	uint8_t status;
+	uint8_t error;
+	uint16_t special;
+} __attribute__((packed)) rx_descriptor_t; 
 
 /* Struct for transmit descriptor (Legacy). */
 typedef struct tx_descriptor_s {
-	uint32_t addr_high, addr_low;
-	uint16_t special, length;
-	uint8_t  css, sta, cmd, cso;
+	uint32_t addr_low;
+	uint32_t addr_high;
+	uint16_t length;
+	uint8_t cso;
+	uint8_t cmd;
+	uint8_t sta;
+	uint8_t css;
+	uint16_t special;
 } tx_descriptor_t;
 
 rx_descriptor_t* rx_ring = NULL;
@@ -128,7 +137,7 @@ static void init_receive_descriptors(void) {
 		curr_descriptor -> addr_low  = (uint32_t) allocate_page();
 
 		/* Reset all other fields */
-		curr_descriptor -> special = 0x0;
+		curr_descriptor -> special = 0x00;
 		curr_descriptor -> length = 0x0;
 		curr_descriptor -> checksum = 0x0;
 		curr_descriptor -> error = 0x0;
@@ -154,7 +163,7 @@ static void init_transmit_descriptors(void) {
 		curr_descriptor -> addr_low  = (uint32_t) allocate_page();
 
 		/* Reset all other fields */
-		curr_descriptor -> special = 0x0;
+		curr_descriptor -> special = 0x00;
 		curr_descriptor -> length = 0x0;
 		curr_descriptor -> css = 0x0;
 		curr_descriptor -> sta = 0x0;
@@ -243,15 +252,65 @@ static void init_transmit(void) {
 	write_reg(TCTL, transmit_ctrl);
 }
 
+/* Set up the relevant interrupts that NIC device should send to CPU */
+static void init_interrupts(void) {
+	/* To avoid race conditions, set/clearing interrupt causes is done 
+	 * via write to two registers. So we first clear everything, then set 
+	 * the interrupt causes we actually want to listen for.
+	 * Also, read ICR to clear any existing interrupts causes. */
+	read_reg(ICR);
+	write_reg(IMS, IMS_LSC | IMS_RXDMT0 | IMS_RX0 | IMS_RTX0); 
+}
+
+static void fake_interrupt(uint32_t interrupt) {
+	write_reg(ICS, interrupt);
+}
 static void e1000_probe(pci_device0_t* pci_dev) {
 	
 	/* Initialize the device */
 	set_MMIO(pci_dev);
+
+	/* No Interrupts. Not Even Once */
+	write_reg(IMC, 0xFFFFFFFF);
+
 	set_MAC_addr();
 	init_control();
-	init_receive();
 	init_transmit();
+	init_receive();
+
+	/* Allow for interrupts. Also allow PCI device to master bus and write interrupts. */
+	en_ints(pci_dev);
+	en_bus_master(pci_dev);
+	init_interrupts();
+
+	/* Fake some interrupts for now */
+	fake_interrupt(IMS_LSC);
+//	fake_interrupt(IMS_RXDMT0);
+//	fake_interrupt(IMS_RX0);
+//	fake_interrupt(IMS_RTX0);
 }
+
+/* Based on the value read from Interrupt cause, process accordingly. */
+void handle_interrupt(void) {
+	uint32_t r = read_reg(ICR);
+	
+	if(r & IMS_LSC) kprintf("LSC \n");
+
+	if(r & IMS_RXDMT0) kprintf("MT0 \n");
+	
+	if(r & IMS_RX0) kprintf("RX0 \n");
+	
+	if(r & IMS_RTX0) kprintf("RTX0 \n");
+
+	kprintf("R: %x\n", r);
+}
+
+
+
+
+
+
+
 
 
 

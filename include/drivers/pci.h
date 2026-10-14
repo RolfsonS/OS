@@ -59,6 +59,21 @@ void print_dev_info(pci_device0_t* pci_dev);
  * Both these used primarily for Drivers 
  */
 void en_bus_master(pci_device0_t* pci_dev);
-
 void dis_bus_master(pci_device0_t* pci_dev);
+
+/* Enables or disables the reception of interrupts on a device */
+void en_ints(pci_device0_t* pci_dev);
+void dis_ints(pci_device0_t* pci_dev);
+
 #endif
+
+
+
+
+
+
+
+
+
+
+

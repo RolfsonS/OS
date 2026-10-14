@@ -1,6 +1,8 @@
 #ifndef E1000_H
 #define E1000_H
 
+void handle_interrupt(void);
+
 /* --------- Relevant Device Registers ----------- */
 /* Deviec Control */
 #define CTRL 	0x0
@@ -17,8 +19,14 @@
 /* Interrupt Cause Read */
 #define ICR 	0xC0
 
+/* Interrupt Cause Set Register */
+#define ICS 	0xC8
+
 /* Interrupt Mask Set/Read */
 #define IMS 	0xD0
+
+/* Interrupt Mask Clear Register */
+#define IMC 	0xD8
 
 /* Receive Control */
 #define RCTL 	0x100
@@ -101,19 +109,15 @@
 #define TCTL_CT 	0xF0
 #define TCTL_COLD 	0x40000
 
+#define IMS_LSC		0x4
+#define IMS_RXDMT0	0x10
+#define IMS_RX0 	0x40
+#define IMS_RTX0 	0x80
+
+
+
+
 #endif 
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

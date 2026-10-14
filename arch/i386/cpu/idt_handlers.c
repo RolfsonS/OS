@@ -6,8 +6,10 @@
 #include <arch/i386/pic.h>
 
 #include <drivers/terminal.h>
+#include <drivers/e1000.h>
 
 #include <lib/kprintf.h>
+
 
 
 void general_idt_handler(void){
@@ -30,4 +32,10 @@ void irq_1_handler(void) {
 
 	/* Send end of interrupt command - Pin 1 */
 	pic_sendEOI(1);
+}
+
+void irq_11_handler(void) {
+	kprintf("Hello\n");
+	handle_interrupt();
+	pic_sendEOI(11);
 }

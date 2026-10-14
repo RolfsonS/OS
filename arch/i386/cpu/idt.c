@@ -17,6 +17,7 @@ static uint64_t	interrupt_entries[256];
 extern void general_idt();
 extern void irq_0();
 extern void irq_1();
+extern void irq_11();
 
 /* An extern assembly function, need for using LIDT assembly command. */
 extern void idt_setup(uint32_t);
@@ -52,6 +53,7 @@ void setup_idt_descriptors(void) {
 	}
 	interrupt_entries[32] = create_idt_descriptor((uint32_t)irq_0, 0x8, 0x8E);
 	interrupt_entries[33] = create_idt_descriptor((uint32_t)irq_1, 0x8, 0x8E);
+	interrupt_entries[43] = create_idt_descriptor((uint32_t)irq_11, 0x8, 0x8E);
 
 	/* Global IDT assignment */
 	interrupt_descriptor_table.size = sizeof(interrupt_entries) - 1;

@@ -329,15 +329,35 @@ void init_pci() {
 void en_bus_master(pci_device0_t* pci_dev) {
 	/* Enable Bus Mastering for a PCI Device */
 	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
-	reg_val ^= 0x4;
+	reg_val |= 0x4;
 	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
 }
 
 void dis_bus_master(pci_device0_t* pci_dev) {
 	/* Disable Bus Mastering for a PCI Device */
 	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
-	reg_val ^= 0x4;
+	reg_val &= ~0x4;
 	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
+}
+
+void en_ints(pci_device0_t* pci_dev) {
+	/* Disable Bus Mastering for a PCI Device */
+	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
+	reg_val &= ~0x400;
+	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
+	
+	uint32_t r = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
+	kprintf("VAL: %x\n", r);
+}
+
+void dis_ints(pci_device0_t* pci_dev) {
+	/* Disable Bus Mastering for a PCI Device */
+	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
+	reg_val |= 0x400;
+	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
+
+	uint32_t r = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
+	kprintf("VAL: %x\n", r);
 }
 
 void print_dev_info(pci_device0_t* pci_dev) {

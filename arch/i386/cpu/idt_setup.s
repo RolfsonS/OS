@@ -3,6 +3,7 @@
 
 .global irq_0 				# Timer interrupt request
 .global irq_1
+.global irq_11
 
 idt_setup:
 	mov 4(%esp), %eax
@@ -31,3 +32,9 @@ irq_1:
 	popal
 	iret
 
+irq_11: 
+	pushal
+	cld
+	call irq_11_handler
+	popal
+	iret

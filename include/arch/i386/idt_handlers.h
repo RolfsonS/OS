@@ -12,5 +12,8 @@ void irq_0_handler(void);
 /* Interrupt Handler 1 - Keyboard Interrupt */
 void irq_1_handler(void);
 
+/* Interrupt Handler */  
+void irq_11_handler(void); 
+
 /* More to come... */ 
 #endif
