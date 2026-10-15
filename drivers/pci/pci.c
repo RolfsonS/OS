@@ -345,9 +345,6 @@ void en_ints(pci_device0_t* pci_dev) {
 	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
 	reg_val &= ~0x400;
 	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
-	
-	uint32_t r = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
-	kprintf("VAL: %x\n", r);
 }
 
 void dis_ints(pci_device0_t* pci_dev) {
@@ -355,9 +352,6 @@ void dis_ints(pci_device0_t* pci_dev) {
 	uint32_t reg_val = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
 	reg_val |= 0x400;
 	pci_reg_write(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4, reg_val);
-
-	uint32_t r = pci_reg_read(pci_dev -> bus, pci_dev -> device, pci_dev -> function, 0x4);
-	kprintf("VAL: %x\n", r);
 }
 
 void print_dev_info(pci_device0_t* pci_dev) {

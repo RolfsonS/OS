@@ -8,12 +8,14 @@
 #include <arch/i386/vmm.h>
 
 #include <net/byteorder.h>
+#include <net/net.h>
 
 #include <lib/kprintf.h>
 #include <lib/string.h>
 
 #include <mm/pmm.h>
 #include <mm/heap.h>
+
 
 /* Values specifying th size of the receive buffer and how many descriptors we use in the ring.
  * It should be noted that 4096 B was choosen so we can easily allocate a slab of physical memory
@@ -27,8 +29,9 @@
  * Allows us to alter content of known RAM memory, used for accessing buffers. */
 #define kvaddr 0xC03FE000
 
-/* Single forward definition for e1000 driver. Needed for struct definition. */
+/* Forward definition for drivers. Needed for struct definition. */
 static void e1000_probe(pci_device0_t* pci_dev);
+static void e1000_send(void);
 
 /* MAC address */
 uint8_t MAC[6];
@@ -38,6 +41,12 @@ pci_driver_t e1000_driver = {
 	.name 	= "e1000",
 	.info 	= {0x100e, 0x8086},
 	.probe 	= e1000_probe, 
+};
+
+net_dev_t net_e1000 = {
+	.MAC 	= 0,
+	.send  	= e1000_send,
+	.recv 	= NULL,
 };
 
 /* Virtual MMIO Address */ 
@@ -79,12 +88,12 @@ static void set_MMIO(pci_device0_t* pci_dev) {
 
 /* Write to NIC register */
 static void write_reg(uint32_t reg, uint32_t val) {
-	*(uint32_t *)(MMIO_LOC + reg) = val;
+	*(volatile uint32_t *)(MMIO_LOC + reg) = val;
 }
 
 /* Read from NIC register */
 static uint32_t read_reg(uint32_t reg) {
-	return *(uint32_t *)(MMIO_LOC + reg);
+	return *(volatile uint32_t *)(MMIO_LOC + reg);
 } 
 
 /* Read the MAC address from RAL and RAH */
@@ -94,6 +103,8 @@ static void set_MAC_addr(void) {
 
 	memcpy(MAC + 4, &MAC_h, sizeof(uint16_t));
 	memcpy(MAC, &MAC_l, sizeof(uint32_t));
+
+
 }
 
 /* Set-up a variety of the NICs control register bits */
@@ -262,17 +273,20 @@ static void init_interrupts(void) {
 	write_reg(IMS, IMS_LSC | IMS_RXDMT0 | IMS_RX0 | IMS_RTX0); 
 }
 
+/* Write a fake interrupt */
 static void fake_interrupt(uint32_t interrupt) {
 	write_reg(ICS, interrupt);
 }
-static void e1000_probe(pci_device0_t* pci_dev) {
-	
+
+
+static void e1000_probe(pci_device0_t* pci_dev) {	
 	/* Initialize the device */
 	set_MMIO(pci_dev);
 
 	/* No Interrupts. Not Even Once */
 	write_reg(IMC, 0xFFFFFFFF);
 
+	/* Set the MAC address, initialize descriptors */
 	set_MAC_addr();
 	init_control();
 	init_transmit();
@@ -282,27 +296,39 @@ static void e1000_probe(pci_device0_t* pci_dev) {
 	en_ints(pci_dev);
 	en_bus_master(pci_dev);
 	init_interrupts();
-
-	/* Fake some interrupts for now */
-	fake_interrupt(IMS_LSC);
-//	fake_interrupt(IMS_RXDMT0);
-//	fake_interrupt(IMS_RX0);
-//	fake_interrupt(IMS_RTX0);
 }
+
+/* Poll the rx descriptor ring for packets after an interrupt */
+
+
+/* Send */
+static void e1000_send(void) {
+	kprintf("TEST\n");
+}
+
+
 
 /* Based on the value read from Interrupt cause, process accordingly. */
 void handle_interrupt(void) {
-	uint32_t r = read_reg(ICR);
+	uint32_t cause = read_reg(ICR);
 	
-	if(r & IMS_LSC) kprintf("LSC \n");
+	if(cause & IMS_LSC) { 
+		kprintf("LSC \n");
+	}
 
-	if(r & IMS_RXDMT0) kprintf("MT0 \n");
-	
-	if(r & IMS_RX0) kprintf("RX0 \n");
-	
-	if(r & IMS_RTX0) kprintf("RTX0 \n");
+	if(cause & IMS_RXDMT0) {
+		kprintf("MT0 \n");
+	}
 
-	kprintf("R: %x\n", r);
+	if(cause & IMS_RX0) {
+		kprintf("RX0 \n");
+	}
+
+	if(cause & IMS_RTX0) {
+		kprintf("RTX0 \n");
+	}
+
+	kprintf("Cause: %x\n", cause);
 }
 
 

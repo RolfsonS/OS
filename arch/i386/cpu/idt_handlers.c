@@ -1,4 +1,4 @@
-#include <stdint.h>
+	#include <stdint.h>
 #include <stddef.h>
 
 #include <arch/i386/idt_handlers.h>
@@ -35,7 +35,7 @@ void irq_1_handler(void) {
 }
 
 void irq_11_handler(void) {
-	kprintf("Hello\n");
+	kprintf("In IRQ Handler\n");
 	handle_interrupt();
 	pic_sendEOI(11);
 }
