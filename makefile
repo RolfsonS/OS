@@ -37,7 +37,10 @@ build/%.o: %.s
 	$(AS) $< -o $@
 
 run: build/myos.iso
-	qemu-system-i386 -cdrom build/myos.iso 
+	qemu-system-i386 -cdrom build/myos.iso \
+ 		-netdev socket,id=n0,udp=127.0.0.1:5555,localaddr=127.0.0.1:5556 \
+	        -device e1000,netdev=n0 \
+		-object filter-dump,id=f0,netdev=n0,file=net.pcap
 
 clean:
 	rm -rf build

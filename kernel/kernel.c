@@ -42,7 +42,7 @@ void kernel_main(multiboot_info_t* mbd, uint32_t magic) {
 	init_heap();
 	init_pci();
 
-	print_eth_info();
+//	print_eth_info();
 
 	while(1){};
 }

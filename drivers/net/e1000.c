@@ -44,9 +44,15 @@ pci_driver_t e1000_driver = {
 	.probe 	= e1000_probe, 
 };
 
+/* E1000 driver as a network device. */ 
 net_dev_t net_e1000 = {
 	.send  	= e1000_send,
 };
+static net_dev_t* net_dev = &net_e1000;
+
+/* RX Head and Tail values. */
+static uint32_t rx_head = 0x0;
+static uint32_t rx_tail = RX_DESCRIPTORS - 1;
 
 /* Virtual MMIO Address */ 
 static uint32_t MMIO_LOC = 0xD000000;
@@ -274,9 +280,9 @@ static void init_interrupts(void) {
 }
 
 /* Write a fake interrupt */
-/*static void fake_interrupt(uint32_t interrupt) {
+static void fake_interrupt(uint32_t interrupt) {
 	write_reg(ICS, interrupt);
-}*/
+}
 
 
 static void e1000_probe(pci_device0_t* pci_dev) {	
@@ -299,12 +305,17 @@ static void e1000_probe(pci_device0_t* pci_dev) {
 	/* Register as a network device, and allow for interrupts */
 	register_net_dev(&net_e1000);
 	init_interrupts();
+
+	fake_interrupt(IMS_RXDMT0);
 }
 
-/* Poll the rx descriptor ring for packets after an interrupt */
+/* Poll the rx descriptor ring for packets after an interrupt. */
+static void rx_poll(void) {
+	
+	net_dev -> recv();
+}
 
-
-/* Send */
+/* Send packets to the rx descriptors. */
 static void e1000_send(void) {
 	kprintf("TEST\n");
 }
@@ -321,14 +332,17 @@ void handle_interrupt(void) {
 
 	if(cause & IMS_RXDMT0) {
 		kprintf("MT0 \n");
+		rx_poll();
 	}
 
 	if(cause & IMS_RX0) {
 		kprintf("RX0 \n");
+		rx_poll();
 	}
 
 	if(cause & IMS_RTX0) {
 		kprintf("RTX0 \n");
+		rx_poll();
 	}
 
 	kprintf("Cause: %x\n", cause);
