@@ -12,7 +12,8 @@ SRCS = arch/i386/boot/boot.s \
        drivers/pci/pci.c drivers/video/terminal.c drivers/net/e1000.c\
        kernel/kernel.c \
        lib/kprintf.c lib/string.c \
-       mm/heap.c mm/pmm.c
+       mm/heap.c mm/pmm.c \
+       net/eth.c
 
 LINK = arch/i386/boot/linker.ld
 

@@ -9,6 +9,7 @@
 
 #include <net/byteorder.h>
 #include <net/net.h>
+#include <net/eth.h>
 
 #include <lib/kprintf.h>
 #include <lib/string.h>
@@ -44,9 +45,7 @@ pci_driver_t e1000_driver = {
 };
 
 net_dev_t net_e1000 = {
-	.MAC 	= 0,
 	.send  	= e1000_send,
-	.recv 	= NULL,
 };
 
 /* Virtual MMIO Address */ 
@@ -104,7 +103,8 @@ static void set_MAC_addr(void) {
 	memcpy(MAC + 4, &MAC_h, sizeof(uint16_t));
 	memcpy(MAC, &MAC_l, sizeof(uint32_t));
 
-
+	/* MAC address to outward facing net dev aswell */
+	memcpy(&net_e1000, MAC, sizeof(MAC));
 }
 
 /* Set-up a variety of the NICs control register bits */
@@ -274,9 +274,9 @@ static void init_interrupts(void) {
 }
 
 /* Write a fake interrupt */
-static void fake_interrupt(uint32_t interrupt) {
+/*static void fake_interrupt(uint32_t interrupt) {
 	write_reg(ICS, interrupt);
-}
+}*/
 
 
 static void e1000_probe(pci_device0_t* pci_dev) {	
@@ -292,9 +292,12 @@ static void e1000_probe(pci_device0_t* pci_dev) {
 	init_transmit();
 	init_receive();
 
-	/* Allow for interrupts. Also allow PCI device to master bus and write interrupts. */
+	/* Allow PCI device to master bus and write interrupts. */
 	en_ints(pci_dev);
 	en_bus_master(pci_dev);
+
+	/* Register as a network device, and allow for interrupts */
+	register_net_dev(&net_e1000);
 	init_interrupts();
 }
 

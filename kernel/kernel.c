@@ -16,6 +16,7 @@
 #include <mm/pmm.h>
 #include <mm/heap.h>
 
+#include <net/eth.h>
 // Check if the compiler things you are targeting the wrong operating system
 #if defined(__linux__)
 #error "You are not using a cross compiler"
@@ -41,6 +42,7 @@ void kernel_main(multiboot_info_t* mbd, uint32_t magic) {
 	init_heap();
 	init_pci();
 
+	print_eth_info();
 
 	while(1){};
 }
