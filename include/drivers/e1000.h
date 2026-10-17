@@ -117,7 +117,8 @@ void handle_interrupt(void);
 #define IMS_RX0 	0x40
 #define IMS_RTX0 	0x80
 
-
+#define RDESC_DD  	0x1
+#define RDESC_EOP 	0x2
 
 #endif 
 

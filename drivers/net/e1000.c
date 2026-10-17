@@ -304,7 +304,8 @@ static void e1000_probe(pci_device0_t* pci_dev) {
 	init_transmit();
 	init_receive();
 
-	/* Used for debugging, allows us to see everything on wire */
+	/* Used for debugging, allows us to see everything on wire.
+	 * Example: "HELLO" Packet passed up through network stack. */
 	init_debug();
 
 	/* Allow PCI device to master bus and write interrupts. */
@@ -315,13 +316,59 @@ static void e1000_probe(pci_device0_t* pci_dev) {
 	register_net_dev(&net_e1000);
 	init_interrupts();
 
-	fake_interrupt(IMS_RXDMT0);
+	// fake_interrupt(IMS_RXDMT0);
 }
+
+/* Clear all the lower fields of the rx descriptor. */
+static void clear_rx(rx_descriptor_t* rx_desc) {
+	rx_desc -> special = 0x00;
+	rx_desc -> length = 0x0;
+	rx_desc -> checksum = 0x0;
+	rx_desc -> error = 0x0;
+	rx_desc -> status = 0x0;
+}
+
+/* When threading is added, there needs to be a seperation of concerns here. 
+ * Currently, this + everything inside the networking stack will run inside ISR.
+ * Probably not the best idea... */
 
 /* Poll the rx descriptor ring for packets after an interrupt. */
 static void rx_poll(void) {
+	/* Essentially, poll the head descriptor, plus any others that may have a packet
+	 * waiting in their buffer. For each packet, kmalloc a new address to pass to ethernet layer,
+	 * copy over the contents, clear the buffer.
+	 *
+	 * Also, move the tail behind head after. */
+	rx_descriptor_t* head = rx_ring + rx_head;
+	uint8_t status = head -> status;
+	uint8_t* known = (uint8_t*) kvaddr;
 	
-	net_dev -> recv();
+	/* While the current descriptor is done and end of packet, keep reading and sending up contents. */
+	while(status & (RDESC_DD | RDESC_EOP)) {
+		/* Extract the address, map it to a known address, and kmalloc new memory. */
+		uint32_t buff_addr = head -> addr_low;
+		map_known(buff_addr);
+		uint8_t* new_buff = (uint8_t*) kmalloc(head -> length);
+		
+		/* Copy contents of memory from rx buffer to new buffer.*/
+		memcpy(new_buff, known, head -> length);
+
+		/* Increment tail and set the receive descriptor tail accordingly. */
+		rx_tail = (rx_tail + 1) % RX_DESCRIPTORS;
+		write_reg(RDT, rx_tail);
+
+		/* Send up to ethernet layer. */
+		net_dev -> recv(new_buff, head -> length);
+
+		/* Clear the rx buffer and the rx status fields */
+		memset(known, 0x0, head -> length);
+		clear_rx(head);
+
+		/* Increment rx_descriptor, update status, and increment global copy of rx_head. */
+		head++;
+		status = head -> status;
+		rx_head = (rx_head + 1) % RX_DESCRIPTORS;
+	}
 }
 
 /* Send packets to the rx descriptors. */
@@ -336,25 +383,25 @@ void handle_interrupt(void) {
 	uint32_t cause = read_reg(ICR);
 	
 	if(cause & IMS_LSC) { 
-		kprintf("LSC \n");
+	//	kprintf("LSC \n");
 	}
 
 	if(cause & IMS_RXDMT0) {
-		kprintf("MT0 \n");
+	//	kprintf("MT0 \n");
 		rx_poll();
 	}
 
 	if(cause & IMS_RX0) {
-		kprintf("RX0 \n");
+	//	kprintf("RX0 \n");
 		rx_poll();
 	}
 
 	if(cause & IMS_RTX0) {
-		kprintf("RTX0 \n");
+	//	kprintf("RTX0 \n");
 		rx_poll();
 	}
 
-	kprintf("Cause: %x\n", cause);
+	// kprintf("Cause: %x\n", cause);
 }
 
 

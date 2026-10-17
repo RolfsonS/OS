@@ -55,7 +55,7 @@ static inline void invlpg(uint32_t vaddr) {
 
 /* Maps known entry to a physical location, meaning we can modify physical
  * memory using a known translation */
-static void map_known(uint32_t phy) {
+void map_known(uint32_t phy) {
 	boot_page_table1[1022] = create_pte(phy, P | RW);
 	invlpg(kvaddr);
 }

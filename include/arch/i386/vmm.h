@@ -71,4 +71,6 @@ void unmap_page(uint32_t v_addr);
 void massive_map_page(uint32_t v_addr, uint32_t p_addr, uint32_t flags, uint32_t size);
 
 uint32_t walk(uint32_t v_addr);
+
+void map_known(uint32_t phy);
 #endif

@@ -13,7 +13,7 @@ typedef struct net_dev_s {
 	void (*send)(void);
 
 	/* Receive packets from device driver */
-	void (*recv)(void);
+	void (*recv)(void* data, size_t size);
 } net_dev_t;
 
 #endif

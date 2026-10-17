@@ -35,7 +35,7 @@ void irq_1_handler(void) {
 }
 
 void irq_11_handler(void) {
-	kprintf("In IRQ Handler\n");
+	// kprintf("In IRQ Handler\n");
 	handle_interrupt();
 	pic_sendEOI(11);
 }
