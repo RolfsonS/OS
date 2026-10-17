@@ -32,7 +32,7 @@
 
 /* Forward definition for drivers. Needed for struct definition. */
 static void e1000_probe(pci_device0_t* pci_dev);
-static void e1000_send(void);
+static void e1000_send(void* data, size_t size);
 
 /* MAC address */
 uint8_t MAC[6];
@@ -53,6 +53,9 @@ static net_dev_t* net_dev = &net_e1000;
 /* RX Head and Tail values. */
 static uint32_t rx_head = 0x0;
 static uint32_t rx_tail = RX_DESCRIPTORS - 1;
+
+/* TX Tail value (Head is tracked by hardware) */
+static uint32_t tx_tail = 0x0;
 
 /* Virtual MMIO Address */ 
 static uint32_t MMIO_LOC = 0xD000000;
@@ -183,7 +186,10 @@ static void init_transmit_descriptors(void) {
 		curr_descriptor -> special = 0x00;
 		curr_descriptor -> length = 0x0;
 		curr_descriptor -> css = 0x0;
-		curr_descriptor -> sta = 0x0;
+
+		/* We actually set the status but to 1. This allows us to use this bit as information
+		 * regarding whether or not the current descriptor has been read and DMAd to NIC. */
+		curr_descriptor -> sta = 0x1;
 		curr_descriptor -> cmd = 0x0;
 		curr_descriptor -> cso = 0x0;
 	} 
@@ -342,7 +348,7 @@ static void rx_poll(void) {
 	rx_descriptor_t* head = rx_ring + rx_head;
 	uint8_t status = head -> status;
 	uint8_t* known = (uint8_t*) kvaddr;
-	
+
 	/* While the current descriptor is done and end of packet, keep reading and sending up contents. */
 	while(status & (RDESC_DD | RDESC_EOP)) {
 		/* Extract the address, map it to a known address, and kmalloc new memory. */
@@ -372,8 +378,36 @@ static void rx_poll(void) {
 }
 
 /* Send packets to the rx descriptors. */
-static void e1000_send(void) {
-	kprintf("TEST\n");
+static void e1000_send(void* data, size_t size) {
+	/* Upon initialization of all rx descriptors, we set the DD bit in status to 1.
+	 * This is the same process the NIC writing back to descriptor after it has DMAed a 
+	 * tx buffer. We set this back to 0 once we write something new to buffer. */ 
+	tx_descriptor_t* tail = tx_ring + tx_tail;
+	uint8_t status = tail -> sta;
+	uint8_t* known = (uint8_t*) kvaddr;
+	
+	/* The buffer is ok to use, as it has been read. */
+	if (status & TDESC_DD) {
+		uint32_t buff_addr = tail -> addr_low;
+
+		/* Map tails physical address to known virtual address, and copy the contents
+		 * of the memory over to this address. */
+		map_known(buff_addr);
+		memcpy(known, data, size);
+
+		/* Set the size of the descriptor field. */
+		tail -> length = size;
+
+		/* Set relevant transmit descriptor command field bits. Also set DD to 0. */
+		tail -> cmd = TDESC_EOP | TDESC_IFCS | TDESC_RS;
+		tail -> sta = 0x0;
+		
+		/* Increment tail and write this value to transmit descriptor tail */
+		tx_tail = (tx_tail + 1) % TX_DESCRIPTORS;
+		write_reg(TDT, tx_tail);
+	} else {
+		/* In future, return a error */
+	}
 }
 
 

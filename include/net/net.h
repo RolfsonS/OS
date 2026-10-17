@@ -10,7 +10,7 @@ typedef struct net_dev_s {
 	uint8_t MAC[6];
 	
 	/* Send packets to device driver */
-	void (*send)(void);
+	void (*send)(void* data, size_t size);
 
 	/* Receive packets from device driver */
 	void (*recv)(void* data, size_t size);

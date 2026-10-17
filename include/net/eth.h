@@ -10,6 +10,8 @@ typedef struct net_dev_s net_dev_t;
  */
 void register_net_dev(net_dev_t* net_dev);
 
+void eth_send(void);
+
 void print_eth_info();
 
 

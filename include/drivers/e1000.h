@@ -120,6 +120,11 @@ void handle_interrupt(void);
 #define RDESC_DD  	0x1
 #define RDESC_EOP 	0x2
 
+#define TDESC_EOP 	0x1
+#define TDESC_IFCS 	0x2
+#define TDESC_RS 	0x8
+#define TDESC_DD 	0x1
+
 #endif 
 
 
