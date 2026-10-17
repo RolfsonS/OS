@@ -284,6 +284,12 @@ static void fake_interrupt(uint32_t interrupt) {
 	write_reg(ICS, interrupt);
 }
 
+/* Set Unicast and Multicast Promiscuous modes */
+static void init_debug() {
+	uint32_t receive = read_reg(RCTL);
+	receive |= RCTL_MPE | RCTL_UPE;
+	write_reg(RCTL, receive);
+}
 
 static void e1000_probe(pci_device0_t* pci_dev) {	
 	/* Initialize the device */
@@ -297,6 +303,9 @@ static void e1000_probe(pci_device0_t* pci_dev) {
 	init_control();
 	init_transmit();
 	init_receive();
+
+	/* Used for debugging, allows us to see everything on wire */
+	init_debug();
 
 	/* Allow PCI device to master bus and write interrupts. */
 	en_ints(pci_dev);

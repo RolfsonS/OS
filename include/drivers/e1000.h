@@ -103,6 +103,9 @@ void handle_interrupt(void);
 #define RCTL_BSIZE_H	0x20000
 #define RCTL_BSEX 	0x2000000
 #define RCTL_SECRC 	0x4000000
+#define RCTL_UPE 	0x8
+#define RCTL_MPE 	0x10
+
 
 #define TCTL_EN 	0x2
 #define TCTL_PSP	0x8
@@ -113,7 +116,6 @@ void handle_interrupt(void);
 #define IMS_RXDMT0	0x10
 #define IMS_RX0 	0x40
 #define IMS_RTX0 	0x80
-
 
 
 
