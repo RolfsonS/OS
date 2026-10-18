@@ -13,7 +13,7 @@ SRCS = arch/i386/boot/boot.s \
        kernel/kernel.c \
        lib/kprintf.c lib/string.c \
        mm/heap.c mm/pmm.c \
-       net/eth.c
+       net/eth.c net/arp.c net/ip4.c
 
 LINK = arch/i386/boot/linker.ld
 
@@ -38,8 +38,8 @@ build/%.o: %.s
 
 run: build/myos.iso
 	qemu-system-i386 -cdrom build/myos.iso \
- 		-netdev socket,id=n0,udp=127.0.0.1:5555,localaddr=127.0.0.1:5556 \
-	        -device e1000,netdev=n0 \
+ 		-netdev tap,id=n0,ifname=tap0,script=no,downscript=no \
+		-device e1000,netdev=n0,mac=52:54:00:12:34:56 \
 		-object filter-dump,id=f0,netdev=n0,file=net.pcap &
 
 clean:

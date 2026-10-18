@@ -1,6 +1,9 @@
 #ifndef ETH_H
 #define ETH_H
 
+#define ARP_ETH_TYPE 	0x0806
+#define IP4_ETH_TYPE 	0x0800
+
 /* Allow for net_dev_t struct to be used */
 typedef struct net_dev_s net_dev_t;
 
@@ -22,8 +25,11 @@ void register_net_dev(net_dev_t* net_dev);
 void eth_send(void);
 
 
-/* Print ethernet info --- probably delete */
-void print_eth_info();
+/* Print ethernet info. DEST, SRC, ETHERTYPE.
+ *
+ * Param: eth_frame* eth, Recv'ed Ethernet Frame to print info for.
+ * */
+void print_eth_info(eth_frame* eth);
 
 
 #endif
