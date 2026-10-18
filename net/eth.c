@@ -10,11 +10,14 @@
 /* Ethernet device */
 net_dev_t* eth_dev; 
 
+
+
 static void eth_recv(void* data, size_t size) {
-	uint8_t* test = (uint8_t*) data;
+	eth_frame* frame = (eth_frame*) data;
+	
 
 	for(size_t i = 0; i < size; i++) {
-		kprintf("%c ", *(test + i));
+		kprintf("%x ", *(test + i));
 	}
 }
 

@@ -285,17 +285,19 @@ static void init_interrupts(void) {
 	write_reg(IMS, IMS_LSC | IMS_RXDMT0 | IMS_RX0 | IMS_RTX0); 
 }
 
-/* Write a fake interrupt */
+/* Commented out for now */
+/* Write a fake interrupt 
 static void fake_interrupt(uint32_t interrupt) {
 	write_reg(ICS, interrupt);
 }
 
-/* Set Unicast and Multicast Promiscuous modes */
+ Set Unicast and Multicast Promiscuous modes 
 static void init_debug() {
 	uint32_t receive = read_reg(RCTL);
 	receive |= RCTL_MPE | RCTL_UPE;
 	write_reg(RCTL, receive);
 }
+*/
 
 static void e1000_probe(pci_device0_t* pci_dev) {	
 	/* Initialize the device */
@@ -312,7 +314,7 @@ static void e1000_probe(pci_device0_t* pci_dev) {
 
 	/* Used for debugging, allows us to see everything on wire.
 	 * Example: "HELLO" Packet passed up through network stack. */
-	init_debug();
+	// init_debug();
 
 	/* Allow PCI device to master bus and write interrupts. */
 	en_ints(pci_dev);
