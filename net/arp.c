@@ -48,7 +48,7 @@ static void print_arp_info(arp_packet* packet) {
 	kprintf("\n");
 }
 
-static void arp_update_cache() {
+static void arp_update_cache(arp_packet* packet) {
 	
 }
 
@@ -63,7 +63,7 @@ void arp_recv(void* data) {
 	// print_arp_info(packet);
 	
 	/* Regardless of whether this is meant for us or not, we still update ARP cache. */
-	arp_update_cache(arp_packet);
+	arp_update_cache(packet);
 
 	/* Then, verify IP address matches our IP.
 	 * IPv4 address is statically defined in ip4.c */

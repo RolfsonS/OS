@@ -16,6 +16,17 @@ typedef struct arp_packet_t {
 	uint8_t tpa[4];		/* Target network address */
 } __attribute__((packed)) arp_packet;
 
+typedef struct arp_cache_entry_s {
+	uint8_t ip[4];
+	uint8_t mac[6];
+	uint8_t state;
+} arp_cache_entry;
+
+/* Statically initialized ARP cache for now.
+ * I want to look into creating a vector for this stuff, need to implement that and mem allocator.
+ * */
+arp_cache_entry arp_cache[5];
+
 /* ARP layer receives a packet from lower layer.
  *
  * Param: void* data, ARP Packet 
