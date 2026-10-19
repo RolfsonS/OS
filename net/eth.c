@@ -17,14 +17,15 @@ static void eth_recv(void* data, size_t size) {
 	/* Cast and call correct protocol based on Ethertype */
 	eth_frame* frame = (eth_frame*) data;
 	uint16_t ether_type = ntohs(frame -> type);
+	//kprintf("SIZE: %d\n", size);
 
 	if(ether_type == ARP_ETH_TYPE ) {
-		arp_recv(data);
+		arp_recv(frame -> payload);
 	} else if (ether_type == IP4_ETH_TYPE) {
-		ip4_recv(data);
+		// ip4_recv(frame -> payload);
 	}
 
-	print_eth_info(data);
+	//print_eth_info(data);
 }
 
 /* Send an ethernet frame */
