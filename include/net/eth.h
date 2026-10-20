@@ -22,7 +22,7 @@ void register_net_dev(net_dev_t* net_dev);
 
 
 /* Send data via an ethernet frame */
-void eth_send(void);
+void eth_send(void* dest_mac, void* packet, size_t size);
 
 
 /* Print ethernet info. DEST, SRC, ETHERTYPE.
@@ -31,5 +31,6 @@ void eth_send(void);
  * */
 void print_eth_info(eth_frame* eth);
 
-
+/* Return a pointer to the MAC address */
+uint8_t* get_mac();
 #endif

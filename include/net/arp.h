@@ -3,6 +3,9 @@
 #define ARP_REQ 	0x1
 #define ARP_REP 	0x2
 
+#define EMPTY 		0x0
+#define GOOD 		0x1
+
 /* ARP Packet Structure */
 typedef struct arp_packet_t {
 	uint16_t htype; 	/* Link protocol */
@@ -22,13 +25,10 @@ typedef struct arp_cache_entry_s {
 	uint8_t state;
 } arp_cache_entry;
 
-/* Statically initialized ARP cache for now.
- * I want to look into creating a vector for this stuff, need to implement that and mem allocator.
- * */
-arp_cache_entry arp_cache[5];
-
 /* ARP layer receives a packet from lower layer.
  *
  * Param: void* data, ARP Packet 
  */
 void arp_recv(void* data);
+
+void init_arp_cache();

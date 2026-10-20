@@ -29,11 +29,8 @@ static void eth_recv(void* data, size_t size) {
 }
 
 /* Send an ethernet frame */
-void eth_send(void) {
-	/* Test data */
-	uint8_t buff[4] = {'T', 'E', 'S', 'T'};
-	
-	eth_dev -> send(buff, 4);
+void eth_send(void* dest_mac, void* packet, size_t size) {
+	eth_frame* 	
 }
 
 /* Register a device driver to Ethernet. */
@@ -58,4 +55,8 @@ void print_eth_info(eth_frame* eth) {
 
 	/* Print EtherType */
 	kprintf("\nEtherType: %x\n", ntohs(eth -> type));
+}
+
+uint8_t* get_mac() {
+	return eth_dev -> MAC;
 }
