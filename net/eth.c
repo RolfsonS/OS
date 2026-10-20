@@ -2,6 +2,9 @@
 #include <stddef.h>
 
 #include <lib/kprintf.h>
+#include <lib/string.h>
+
+#include <mm/heap.h>
 
 #include <net/net.h>
 #include <net/byteorder.h>
@@ -22,7 +25,7 @@ static void eth_recv(void* data, size_t size) {
 	if(ether_type == ARP_ETH_TYPE ) {
 		arp_recv(frame -> payload);
 	} else if (ether_type == IP4_ETH_TYPE) {
-		// ip4_recv(frame -> payload);
+		ip4_recv(frame -> payload);
 	}
 
 	//print_eth_info(data);
@@ -30,7 +33,15 @@ static void eth_recv(void* data, size_t size) {
 
 /* Send an ethernet frame */
 void eth_send(void* dest_mac, void* packet, size_t size) {
-	eth_frame* 	
+	/* Malloc an eth frame, memcpy, and send off. */
+	eth_frame* frame = (eth_frame*) kmalloc(size + sizeof(eth_frame));
+	
+	memcpy(frame -> dest, dest_mac, sizeof(frame -> dest));
+	memcpy(frame -> src, get_mac, sizeof(frame -> src));
+	frame -> type = htons(ARP_ETH_TYPE);
+	memcpy(frame -> payload, packet, size);
+
+	eth_dev -> send(frame, size + sizeof(eth_frame));
 }
 
 /* Register a device driver to Ethernet. */
