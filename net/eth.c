@@ -32,13 +32,13 @@ static void eth_recv(void* data, size_t size) {
 }
 
 /* Send an ethernet frame */
-void eth_send(void* dest_mac, void* packet, size_t size) {
+void eth_send(void* dest_mac, void* packet, size_t size, uint16_t type) {
 	/* Malloc an eth frame, memcpy, and send off. */
 	eth_frame* frame = (eth_frame*) kmalloc(size + sizeof(eth_frame));
 	
 	memcpy(frame -> dest, dest_mac, sizeof(frame -> dest));
 	memcpy(frame -> src, get_mac, sizeof(frame -> src));
-	frame -> type = htons(ARP_ETH_TYPE);
+	frame -> type = htons(type);
 	memcpy(frame -> payload, packet, size);
 
 	eth_dev -> send(frame, size + sizeof(eth_frame));

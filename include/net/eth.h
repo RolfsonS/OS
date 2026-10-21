@@ -22,7 +22,7 @@ void register_net_dev(net_dev_t* net_dev);
 
 
 /* Send data via an ethernet frame */
-void eth_send(void* dest_mac, void* packet, size_t size);
+void eth_send(void* dest_mac, void* packet, size_t size, uint16_t tpye);
 
 
 /* Print ethernet info. DEST, SRC, ETHERTYPE.

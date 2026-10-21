@@ -137,9 +137,9 @@ static void arp_res(arp_packet* packet) {
 
 	/* Pass this down to ethernet layer.
 	 * Eth layer needs to know destination MAC and size. */
- 	eth_send(packet -> sha, snd_pack, sizeof(arp_packet));	
+ 	eth_send(packet -> sha, snd_pack, sizeof(arp_packet), ARP_ETH_TYPE);	
 
-	print_arp_info(snd_pack);
+	// print_arp_info(snd_pack);
 }
 
 /* Init first entry of ARP cache */
