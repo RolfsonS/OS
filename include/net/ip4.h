@@ -24,4 +24,6 @@ typedef struct ip4_packet_S {
  */
 void ip4_recv(void* data);
 
+void ip4_send(void* dest_ip, void* packet, size_t size, uint16_t type);
+
 uint8_t* ret_ip(void);

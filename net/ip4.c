@@ -3,6 +3,8 @@
 
 #include <lib/kprintf.h>
 
+#include <mm/heap.h>
+
 #include <net/ip4.h>
 #include <net/eth.h>
 #include <net/byteorder.h>
@@ -52,6 +54,15 @@ static void print_ip4_info(ip4_packet* packet) {
 	kprintf("\n");
 } 
 
+/* Send an IP4 packet to Ethernet layer */
+void ip4_send(void* dest_ip, void* packet, size_t size, uint16_t type) {
+	ip4_packet* snd_packet = (ip4_packet*) kmalloc(sizeof(ip4_packet) + size);
+	
+	/* Fill in necessary fields. */
+	
+
+}
+
 /* IP packet received from layer below. */
 void ip4_recv(void* data) {
 	/* Cast to IP packet, assign to correct protocol. 
@@ -60,7 +71,7 @@ void ip4_recv(void* data) {
 	uint8_t protocol = packet -> proto;
 
 	if(protocol == IP4_ICMP) {
-		icmp_recv(packet -> payload);
+		icmp_recv(packet -> payload, packet -> source_addr);
 	} 
 	print_ip4_info(packet);
 }

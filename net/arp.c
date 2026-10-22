@@ -171,4 +171,35 @@ void arp_recv(void* data) {
 	} 
 }
 
+/* Search the ARP cache for a MAC address (assume we have it for now) */
+
+uint8_t* search_arp_cache(void* ip) {
+	arp_cache_entry* cache_entry = arp_cache;
+
+	/* TODO: Fix all other loops, ARP cache is fixed size */
+	for(size_t entry = 0; entry < ARP_CACHE_SIZE; entry++) {
+		if(!memcmp(cache_entry -> ip, ip, sizeof(cache_entry -> ip))) {
+			return cache_entry -> mac;
+		}
+		cache_entry++;
+	}
+
+} 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
