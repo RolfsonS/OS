@@ -16,4 +16,17 @@ typedef struct net_dev_s {
 	void (*recv)(void* data, size_t size);
 } net_dev_t;
 
+/* Background -- there were lots of problems with passing parameters up and down the 
+ * stack. For example, IP -> ICMP, the ICMP packet has no way of remembering the 
+ * senders IP address, so sending back down requires IP to actually send this info up.
+ * This becomes extremely tedious and wasteful.
+ *
+ * Instead pkt_buff stores information regarding MAC, IP, and Data and passese this around instead.
+ * This requires upgrading... want to use a single buffer in the future (Linux skb style).
+ */
+typedef struct pkt_buff_s {
+	uint8_t MAC[6];
+	uint8_t IP[4];
+	void* data;
+} pkt_buff;
 #endif

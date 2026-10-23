@@ -16,7 +16,7 @@ typedef struct ip4_packet_S {
 	uint8_t source_addr[4];
 	uint8_t dest_addr[4];
 	uint8_t payload[];
-} __attribute__((packet)) ip4_packet;
+ }__attribute__((packed)) ip4_packet;
 
 /* IPv4 Layer receiving a packet from the layer below. 
  *

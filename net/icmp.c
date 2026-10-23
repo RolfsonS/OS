@@ -28,10 +28,11 @@ static void icmp_echo_req(void* packet, void* ip_addr) {
 	
 	/* Set checksum to 0, then compute the real checksum */
 	snd_packet -> checksum = 0x0;
-	snd_packet -> checksum = inet_checksum(packet, sizeof(icmp_packet));
-
+	snd_packet -> checksum = htons(inet_checksum(packet, sizeof(icmp_packet)));
+	kprintf("\nSIZE: %x \n", sizeof(icmp_packet));
 	/* Send this IP stack */
-	ip4_send(ip_addr, snd_packet, sizeof(icmp_packet), IP4_ICMP);
+	print_icmp_info(snd_packet);
+	//ip4_send(ip_addr, snd_packet, sizeof(icmp_packet), IP4_ICMP);
 }
 
 /* Receive data from IP4 layer */
@@ -43,7 +44,7 @@ void icmp_recv(void* data, void* ip_addr) {
 	uint8_t type = packet -> type;
 	if(type == ECHO_REQUEST) {
 		/* Send a packet responding to echo request */	
-		kprintf("ICMP REPLY");
+		// kprintf("ICMP REPLY");
 		icmp_echo_req(packet, ip_addr);
 	}
 	print_icmp_info(packet);
@@ -71,5 +72,5 @@ uint16_t inet_checksum(void* data, size_t size) {
 		sum = (sum & 0xFFFF) + (sum >> 16);
 	}
 
-	return (uint16_t) sum;
+	return (uint16_t) ~sum;
 }

@@ -73,7 +73,7 @@ void ip4_recv(void* data) {
 	if(protocol == IP4_ICMP) {
 		icmp_recv(packet -> payload, packet -> source_addr);
 	} 
-	print_ip4_info(packet);
+//	print_ip4_info(packet);
 }
 
 uint8_t* ret_ip(void) {
