@@ -365,6 +365,7 @@ static void rx_poll(void) {
 		rx_tail = (rx_tail + 1) % RX_DESCRIPTORS;
 		write_reg(RDT, rx_tail);
 
+		/* TODO: Start network packet here, no length required. */
 		/* Send up to ethernet layer. */
 		net_dev -> recv(new_buff, head -> length);
 
@@ -396,7 +397,7 @@ static void e1000_send(void* data, size_t size) {
 		 * of the memory over to this address. */
 		map_known(buff_addr);
 		memcpy(known, data, size);
-
+			
 		/* Set the size of the descriptor field. */
 		tail -> length = size;
 
