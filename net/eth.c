@@ -16,19 +16,22 @@
 net_dev_t* eth_dev; 
 
 /* Receive an ethernet frame from the layer below */
-static void eth_recv(void* data, size_t size) {
+static void eth_recv(pkt_buff* pkt) {
 	/* Cast and call correct protocol based on Ethertype */
-	eth_frame* frame = (eth_frame*) data;
+	eth_frame* frame = (eth_frame*) pkt -> data;
 	uint16_t ether_type = ntohs(frame -> type);
-	//kprintf("SIZE: %d\n", size);
 
+	/* Set the MAC address of the Sender. */
+	pkt -> MAC = frame -> source;
+
+	/* TODO: Change this to an array based call */
 	if(ether_type == ARP_ETH_TYPE ) {
-		arp_recv(frame -> payload);
+		arp_recv(pkt);
 	} else if (ether_type == IP4_ETH_TYPE) {
-		ip4_recv(frame -> payload);
+	//	ip4_recv(frame -> payload);
 	}
 
-	//print_eth_info(data);
+	print_eth_info((eth_frame*)pkt -> data);
 }
 
 /* Send an ethernet frame */

@@ -29,7 +29,8 @@ typedef struct arp_cache_entry_s {
  *
  * Param: void* data, ARP Packet 
  */
-void arp_recv(void* data);
+void arp_recv(pkt_buff* pkt);
+
 void init_arp_cache();
 
 uint8_t* search_arp_cache(void* data);

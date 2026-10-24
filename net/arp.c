@@ -147,10 +147,10 @@ void init_arp_cache() {
 	arp_cache -> state = EMPTY;
 }
 
-void arp_recv(void* data) {
+void arp_recv(pkt_buff* pkt) {
 	/* Cast to ARP packet. Then , depending on the Operation field, we 
 	 * know to either update ARP cache or create a response. */
-	arp_packet* packet = (arp_packet*) data;
+	arp_packet* packet = (arp_packet*) pkt -> data;
 	// print_arp_info(packet);
 	
 	/* Regardless of whether this is meant for us or not, we still update ARP cache. */

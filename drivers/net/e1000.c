@@ -365,9 +365,13 @@ static void rx_poll(void) {
 		rx_tail = (rx_tail + 1) % RX_DESCRIPTORS;
 		write_reg(RDT, rx_tail);
 
-		/* TODO: Start network packet here, no length required. */
+		/* Start network packet here, no length required (I think...).
+		 * Point data to virtual memory address of the new_buff location.*/
+		pkt_buff* pkt = (pkt_buff*) kmalloc(sizeof(pkt_buff));
+		pkt -> data = new_buff;
+
 		/* Send up to ethernet layer. */
-		net_dev -> recv(new_buff, head -> length);
+		net_dev -> recv(pkt);
 
 		/* Clear the rx buffer and the rx status fields */
 		memset(known, 0x0, head -> length);
