@@ -77,7 +77,7 @@ static void print_ip4_info(ip4_packet* packet) {
 /* Send an IP4 packet to Ethernet layer */
 void ip4_send(pkt_buff* pkt) {
 	/* Move head... and cast to an ip4 packet. */
-	pkt -> data -= sizeof(ip4_packet);
+	pkt_buff_pull(pkt, sizeof(ip4_packet));
 	ip4_packet* ip4_pkt = (ip4_packet*) pkt -> data;
 
 	/* Set packet Meta data. */
@@ -126,7 +126,7 @@ void ip4_recv(pkt_buff* pkt) {
 	pkt -> trans_length = total_len - header_len;
 
 	/* Increment... FIX! */
-	pkt -> data += header_len;
+	pkt_buff_push(pkt, header_len);
 
 	/* Call the relevant L4 Protocol. */
 	handlers[protocol].handler(pkt);

@@ -62,4 +62,19 @@ typedef struct net_dev_s {
 	void (*recv)(pkt_buff* pkt);
 } net_dev_t;
 
+/* Pull the data forward (towards the start) */
+static inline void pkt_buff_pull(pkt_buff* pkt, size_t size) {
+	pkt -> data -= size;
+}
+
+/* Push the data back (away from start) */
+static inline void pkt_buff_push(pkt_buff* pkt, size_t size) {
+	pkt -> data += size;
+}
+
 #endif
+
+
+
+
+

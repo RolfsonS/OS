@@ -61,8 +61,7 @@ static void icmp_echo_req(pkt_buff* pkt) {
 void icmp_recv(pkt_buff* pkt) {
 	/* Cast to ICMP packet, then make decision */
 	icmp_packet* icmp_pkt = (icmp_packet*) pkt -> data;
-	print_icmp_info(icmp_pkt);
-	kprintf("\n");
+	// print_icmp_info(icmp_pkt);
 
 	/* Check the type, pass to the correct layer (also may need to cast payload) */
 	uint8_t type = icmp_pkt -> type;

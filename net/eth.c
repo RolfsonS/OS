@@ -45,9 +45,8 @@ static void eth_recv(pkt_buff* pkt) {
 	/* Set the MAC address of the Sender. */
 	memcpy(pkt -> MAC, frame -> src, sizeof(pkt -> MAC));
 
-	/* Move the data to the next location
-	 * TODO: Find a way to move head and tail for certain packet types. */
-	pkt -> data += sizeof(eth_frame);
+	/* Move the data to the next location */
+	pkt_buff_push(pkt, sizeof(eth_frame));
 
 	/* Call L3 receive protocl. */
 	handlers[ether_type & ETHER_MASK].handler(pkt);
@@ -58,8 +57,7 @@ static void eth_recv(pkt_buff* pkt) {
 /* Send an ethernet frame */
 void eth_send(pkt_buff* pkt) {
 	/* Malloc an eth frame, memcpy, and send off. */
-	/* Need to fix this... can't do this weird addition/subtraction */
-	pkt -> data -= sizeof(eth_frame);
+	pkt_buff_pull(pkt, sizeof(eth_frame));
 	eth_frame* frame = (eth_frame*) pkt -> data;
 	
 	/* Increment the size field by the size of ethernet frame */
