@@ -1,8 +1,8 @@
 /* Internet Procotol Version 4 */
 
-#define IP4_ICMP	0x1
-#define IP4_TCP 	0x6
-#define IP4_UDP 	0x11
+#define IP4_VER  	0x4
+
+typedef struct pkt_buff_s pkt_buff;
 
 typedef struct ip4_packet_S {
 	uint8_t version_ihl;
@@ -22,8 +22,8 @@ typedef struct ip4_packet_S {
  *
  * Param: void* data, Data of the packet. Length is a field.
  */
-void ip4_recv(void* data);
+void ip4_recv(pkt_buff* pkt);
 
-void ip4_send(void* dest_ip, void* packet, size_t size, uint16_t type);
+void ip4_send(pkt_buff* pkt);
 
 uint8_t* ret_ip(void);

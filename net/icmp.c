@@ -9,7 +9,7 @@
 #include <net/eth.h>
 #include <net/byteorder.h>
 #include <net/icmp.h>
-
+#include <net/net.h>
 
 static void print_icmp_info(icmp_packet* packet) {
 	uint8_t t = packet -> type;
@@ -19,35 +19,41 @@ static void print_icmp_info(icmp_packet* packet) {
 
 }
 
-static void icmp_echo_req(void* packet, void* ip_addr) {
-	icmp_packet* snd_packet = (icmp_packet*) kmalloc(sizeof(icmp_packet));
-	
+static void icmp_echo_req(pkt_buff* pkt) {
+	/* Cast the pkt_buff to an ICMP type */
+	icmp_packet* icmp_pkt = (icmp_packet*) pkt -> data;
+
 	/* Set type and code. */
-	snd_packet -> type = ECHO_REPLY;
-	snd_packet -> code = 0x0;
+	icmp_pkt -> type = ECHO_REPLY;
+	icmp_pkt -> code = 0x0;
 	
 	/* Set checksum to 0, then compute the real checksum */
-	snd_packet -> checksum = 0x0;
-	snd_packet -> checksum = htons(inet_checksum(packet, sizeof(icmp_packet)));
-	kprintf("\nSIZE: %x \n", sizeof(icmp_packet));
-	/* Send this IP stack */
-	print_icmp_info(snd_packet);
-	//ip4_send(ip_addr, snd_packet, sizeof(icmp_packet), IP4_ICMP);
+	icmp_pkt -> checksum = 0x0;
+	icmp_pkt -> checksum = htons(inet_checksum(icmp_pkt, pkt -> trans_length));
+		
+	/* Set relevant pkt_buff meta data, incluing network layer type and size */
+	pkt -> t_type = TRANS_ICMP;
+	pkt -> size = pkt -> trans_length;
+
+	/* Send this IP stack. */
+	//print_icmp_info(icmp_pkt);
+	ip4_send(pkt);
 }
 
 /* Receive data from IP4 layer */
-void icmp_recv(void* data, void* ip_addr) {
+void icmp_recv(pkt_buff* pkt) {
 	/* Cast to ICMP packet, then make decision */
-	icmp_packet* packet = (icmp_packet*) data;
+	icmp_packet* icmp_pkt = (icmp_packet*) pkt -> data;
+	print_icmp_info(icmp_pkt);
+	kprintf("\n");
 
 	/* Check the type, pass to the correct layer (also may need to cast payload) */
-	uint8_t type = packet -> type;
+	uint8_t type = icmp_pkt -> type;
 	if(type == ECHO_REQUEST) {
 		/* Send a packet responding to echo request */	
-		// kprintf("ICMP REPLY");
-		icmp_echo_req(packet, ip_addr);
+		icmp_echo_req(pkt);
 	}
-	print_icmp_info(packet);
+	//print_icmp_info(packet);
 }
 
 /* Compute the Checksum of a packet */

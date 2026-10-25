@@ -32,7 +32,7 @@ static void eth_recv(pkt_buff* pkt) {
 	if(ether_type == NET_ARP ) {
 		arp_recv(pkt);
 	} else if (ether_type == NET_IP4) {
-	//	ip4_recv(frame -> payload);
+		ip4_recv(pkt);
 	}
 
 	// print_eth_info((eth_frame*)pkt -> data);
@@ -53,7 +53,6 @@ void eth_send(pkt_buff* pkt) {
 	memcpy(frame -> src, get_mac(), sizeof(pkt -> MAC));
 	frame -> type = htons(pkt -> n_type);
 
-	print_eth_info((eth_frame*) pkt -> data);
 	/* Send the frame to DD */
 	eth_dev -> send(pkt);
 }

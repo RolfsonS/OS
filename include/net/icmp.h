@@ -4,6 +4,8 @@
 #define ECHO_REPLY 	0x0
 #define ECHO_REQUEST 	0x8
 
+typedef struct pkt_buff_s pkt_buff;
+
 typedef struct icmp_packet_s {
 	uint8_t type;
 	uint8_t code;
@@ -12,8 +14,14 @@ typedef struct icmp_packet_s {
 	uint8_t rest[];
 } __attribute__((packed)) icmp_packet;
 
+typedef struct echo_s {
+	uint16_t id;
+	uint16_t seq_num;
+	uint8_t payload[];
+} __attribute__((packed)) ping_s;
+
 /* Receive packet from IP layer. */
-void icmp_recv(void* data, void* ip_addr);
+void icmp_recv(pkt_buff* pkt);
 
 /* Compute inet cehcksum */
 uint16_t inet_checksum(void* data, size_t size);

@@ -2,6 +2,7 @@
 #include <stddef.h>
 
 #include <lib/kprintf.h>
+#include <lib/string.h>
 
 #include <mm/heap.h>
 
@@ -9,14 +10,19 @@
 #include <net/eth.h>
 #include <net/byteorder.h>
 #include <net/icmp.h>
+#include <net/net.h>
 
 /* Macros for certain IP4 packet fields */
 #define GET_VERSION(n)	((n) >> 4u)
 #define GET_IHL(n) 	((n) & 0x0F)
 #define GET_DSCP(n)	((n) >> 2u)
 #define GET_ENC(n)	((n) & 0x3)
-#define	GET_FLAGS(n)	((n) >> 13)
+#define	GET_FLAGS(n)	((n) >> 13u)
 #define GET_FRAG(n)	((n) & 0x1FFF)
+
+#define SET_VER_IHL(n, m) 	(((n) << 4u)| ((m) & 0xF))
+#define SET_DSCP_ECN(n, m)	(((n) << 2u) | ((m) & 0x3))
+#define SET_FLAGS_FRAGS(n, m)	(((n) << 13u) | ((m) & 0x1FFF)) 
 
 
 /* Statically defined, global IP address */
@@ -55,25 +61,64 @@ static void print_ip4_info(ip4_packet* packet) {
 } 
 
 /* Send an IP4 packet to Ethernet layer */
-void ip4_send(void* dest_ip, void* packet, size_t size, uint16_t type) {
-	ip4_packet* snd_packet = (ip4_packet*) kmalloc(sizeof(ip4_packet) + size);
-	
-	/* Fill in necessary fields. */
-	
+void ip4_send(pkt_buff* pkt) {
+	/* Move head... and cast to an ip4 packet. */
+	pkt -> data -= sizeof(ip4_packet);
+	ip4_packet* ip4_pkt = (ip4_packet*) pkt -> data;
 
+	/* Set packet Meta data. */
+	pkt -> n_type = NET_IP4; 
+	pkt -> size += sizeof(ip4_packet);
+
+	/* Fill in necessary fields. */
+	ip4_pkt -> version_ihl = SET_VER_IHL(IP4_VER, 0x5);
+	ip4_pkt -> dcsp_ecn = SET_DSCP_ECN(0x0, 0x0);
+	ip4_pkt -> len = htons(pkt -> trans_length + sizeof(ip4_packet));
+	ip4_pkt -> id = htons(0x0);
+	ip4_pkt -> flag_frag = htons(SET_FLAGS_FRAGS(0x0, 0x0));
+	ip4_pkt -> ttl = 0x50;
+	
+	/* For the protocol, this was passed down via meta data. */
+	ip4_pkt -> proto = pkt -> t_type;
+
+	/* Let checksum = 0x0, then recalculate once every other field is complete */
+	ip4_pkt -> h_chksm = 0x0;
+
+	/* Set the host and sender address via memcpy */
+	memcpy(ip4_pkt -> source_addr, ret_ip(), sizeof(pkt -> IP));
+	memcpy(ip4_pkt -> dest_addr, pkt -> IP, sizeof(pkt -> IP));
+
+	/* Calculate the checksum. */
+	uint16_t chksm = htons(inet_checksum(ip4_pkt, sizeof(ip4_packet)));
+	ip4_pkt -> h_chksm = chksm;
+
+	/* Send to ethernet layer. */
+	eth_send(pkt);
 }
 
 /* IP packet received from layer below. */
-void ip4_recv(void* data) {
+void ip4_recv(pkt_buff* pkt) {
 	/* Cast to IP packet, assign to correct protocol. 
-	 * TODO: Drop if not matching IP or correct checksum. */
-	ip4_packet* packet = (ip4_packet*) data;
-	uint8_t protocol = packet -> proto;
+	 * TODO: Drop if not matching IP or correct checksum (Or options) */
+	ip4_packet* ip4_pkt = (ip4_packet*) pkt -> data;
+	uint8_t protocol = ip4_pkt -> proto;
 
-	if(protocol == IP4_ICMP) {
-		icmp_recv(packet -> payload, packet -> source_addr);
+	/* Set the pkt_buff's IP address and transport length. */
+	memcpy(pkt -> IP, ip4_pkt -> source_addr, sizeof(pkt -> IP));
+
+	/* The IHL field indicates amount of 32 bit entries, so mutliply by 4 for bytes */
+	size_t header_len = GET_IHL(ip4_pkt -> version_ihl) << 2;
+	size_t total_len  = ntohs(ip4_pkt -> len);
+	pkt -> trans_length = total_len - header_len;
+
+	/* Increment... FIX! */
+	pkt -> data += header_len;
+
+	/* TODO: Once again, as in Eth, use potocol as index into an array */
+	if(protocol == TRANS_ICMP) {
+		icmp_recv(pkt);
 	} 
-//	print_ip4_info(packet);
+	print_ip4_info((ip4_packet*) pkt -> data);
 }
 
 uint8_t* ret_ip(void) {

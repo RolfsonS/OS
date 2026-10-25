@@ -10,9 +10,9 @@ typedef enum network_type_t {
 
 /* OSI L4 types, multiplexed via L3 */
 typedef enum transport_type_t {
-	TRANS_UDP,
-	TRANS_TCP,
-	TRANS_ICMP
+	TRANS_ICMP = 0x1,
+	TRANS_TCP = 0x6,
+	TRANS_UDP = 0x11
 } transport_type;
 
 
@@ -39,7 +39,12 @@ typedef struct pkt_buff_s {
 	 * For example, ARP -> ETH defines an ARP Ethernet type.
 	 * Or, UDP/TCP -> IP defines their types */
 	network_type n_type;
-	transport_type t_type; 
+	transport_type t_type;
+
+	/* Transport layer protocols rely on the network layer 
+	 * for determining the size of the packet, provided by 
+	 * this field. */
+	size_t trans_length;
 } pkt_buff;
 
 /* Struct for representing a network device. 
