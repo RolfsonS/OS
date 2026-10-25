@@ -24,6 +24,20 @@
 #define SET_DSCP_ECN(n, m)	(((n) << 2u) | ((m) & 0x3))
 #define SET_FLAGS_FRAGS(n, m)	(((n) << 13u) | ((m) & 0x1FFF)) 
 
+/* There 256 possible IP protocols */
+#define IP_PROTOS 	0xFF
+
+/* Array based handling based on the IP packets type. */
+typedef struct ip_proto_handler_t {
+	void (*handler) (pkt_buff* pkt);
+} ip_proto_handler;
+
+/* Array for all the handlers */
+static const ip_proto_handler handlers[IP_PROTOS] = {
+	[TRANS_ICMP] = {
+		.handler = icmp_recv,
+	},
+};
 
 /* Statically defined, global IP address */
 static const uint8_t ip4_addr[4] = {192, 168, 100, 2}; 
@@ -114,11 +128,10 @@ void ip4_recv(pkt_buff* pkt) {
 	/* Increment... FIX! */
 	pkt -> data += header_len;
 
-	/* TODO: Once again, as in Eth, use potocol as index into an array */
-	if(protocol == TRANS_ICMP) {
-		icmp_recv(pkt);
-	} 
-	print_ip4_info((ip4_packet*) pkt -> data);
+	/* Call the relevant L4 Protocol. */
+	handlers[protocol].handler(pkt);
+
+	//print_ip4_info((ip4_packet*) pkt -> data);
 }
 
 uint8_t* ret_ip(void) {

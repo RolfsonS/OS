@@ -11,6 +11,23 @@
 #include <net/icmp.h>
 #include <net/net.h>
 
+/* Start with 16 ICMP types. */
+#define ICMP_TYPES	0xF
+
+static void icmp_echo_req(pkt_buff* pkt);
+
+
+/* Similar to ETH and IP4, use an array indexed based on ICMP Type. */
+typedef struct icmp_handler_t {
+	void (*handler) (pkt_buff* pkt);
+} icmp_handler;
+
+static const icmp_handler handlers[ICMP_TYPES] = {
+	[ECHO_REQUEST] = {
+		.handler = icmp_echo_req,
+	},
+};
+
 static void print_icmp_info(icmp_packet* packet) {
 	uint8_t t = packet -> type;
 	uint8_t c = packet -> code;
@@ -49,10 +66,8 @@ void icmp_recv(pkt_buff* pkt) {
 
 	/* Check the type, pass to the correct layer (also may need to cast payload) */
 	uint8_t type = icmp_pkt -> type;
-	if(type == ECHO_REQUEST) {
-		/* Send a packet responding to echo request */	
-		icmp_echo_req(pkt);
-	}
+	handlers[type].handler(pkt);
+
 	//print_icmp_info(packet);
 }
 

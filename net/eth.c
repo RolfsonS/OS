@@ -15,6 +15,27 @@
 /* Ethernet device */
 net_dev_t* eth_dev; 
 
+/* Mask  lower 16 bits of Ethertype to find the correct handler, 
+ * so max 16 entires */
+#define ETHER_TYPES	0xF
+#define ETHER_MASK 	0xF
+
+/* Interface for Ethertype Handler */
+typedef struct eth_type_handler_t {
+	void (*handler)(pkt_buff* pkt);
+} eth_type_handler;
+
+/* Future TODO: Based on the ETHER_TYPE mask, there may be collisions. Linux
+ * points to a struct that calls exact protocol based on exact ethertype. */
+static const eth_type_handler handlers[ETHER_TYPES] = {
+	[0x0] = {
+		.handler = ip4_recv,
+	},
+	[0x6] = {
+		.handler = arp_recv,
+	},
+};
+
 /* Receive an ethernet frame from the layer below */
 static void eth_recv(pkt_buff* pkt) {
 	/* Cast and call correct protocol based on Ethertype */
@@ -28,12 +49,8 @@ static void eth_recv(pkt_buff* pkt) {
 	 * TODO: Find a way to move head and tail for certain packet types. */
 	pkt -> data += sizeof(eth_frame);
 
-	/* TODO: Change this to an array based call */
-	if(ether_type == NET_ARP ) {
-		arp_recv(pkt);
-	} else if (ether_type == NET_IP4) {
-		ip4_recv(pkt);
-	}
+	/* Call L3 receive protocl. */
+	handlers[ether_type & ETHER_MASK].handler(pkt);
 
 	// print_eth_info((eth_frame*)pkt -> data);
 }
