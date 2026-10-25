@@ -6,6 +6,8 @@
 #define EMPTY 		0x0
 #define GOOD 		0x1
 
+typedef struct pkt_buff_s pkt_buff;
+
 /* ARP Packet Structure */
 typedef struct arp_packet_t {
 	uint16_t htype; 	/* Link protocol */

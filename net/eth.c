@@ -22,29 +22,40 @@ static void eth_recv(pkt_buff* pkt) {
 	uint16_t ether_type = ntohs(frame -> type);
 
 	/* Set the MAC address of the Sender. */
-	pkt -> MAC = frame -> source;
+	memcpy(pkt -> MAC, frame -> src, sizeof(pkt -> MAC));
+
+	/* Move the data to the next location
+	 * TODO: Find a way to move head and tail for certain packet types. */
+	pkt -> data += sizeof(eth_frame);
 
 	/* TODO: Change this to an array based call */
-	if(ether_type == ARP_ETH_TYPE ) {
+	if(ether_type == NET_ARP ) {
 		arp_recv(pkt);
-	} else if (ether_type == IP4_ETH_TYPE) {
+	} else if (ether_type == NET_IP4) {
 	//	ip4_recv(frame -> payload);
 	}
 
-	print_eth_info((eth_frame*)pkt -> data);
+	// print_eth_info((eth_frame*)pkt -> data);
 }
 
 /* Send an ethernet frame */
-void eth_send(void* dest_mac, void* packet, size_t size, uint16_t type) {
+void eth_send(pkt_buff* pkt) {
 	/* Malloc an eth frame, memcpy, and send off. */
-	eth_frame* frame = (eth_frame*) kmalloc(size + sizeof(eth_frame));
+	/* Need to fix this... can't do this weird addition/subtraction */
+	pkt -> data -= sizeof(eth_frame);
+	eth_frame* frame = (eth_frame*) pkt -> data;
 	
-	memcpy(frame -> dest, dest_mac, sizeof(frame -> dest));
-	memcpy(frame -> src, get_mac, sizeof(frame -> src));
-	frame -> type = htons(type);
-	memcpy(frame -> payload, packet, size);
+	/* Increment the size field by the size of ethernet frame */
+	pkt -> size += sizeof(eth_frame);
 
-	eth_dev -> send(frame, size + sizeof(eth_frame));
+	/* Build the Ethernet frame */
+	memcpy(frame -> dest, pkt -> MAC, sizeof(pkt -> MAC));
+	memcpy(frame -> src, get_mac(), sizeof(pkt -> MAC));
+	frame -> type = htons(pkt -> n_type);
+
+	print_eth_info((eth_frame*) pkt -> data);
+	/* Send the frame to DD */
+	eth_dev -> send(pkt);
 }
 
 /* Register a device driver to Ethernet. */

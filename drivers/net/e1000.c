@@ -32,7 +32,7 @@
 
 /* Forward definition for drivers. Needed for struct definition. */
 static void e1000_probe(pci_device0_t* pci_dev);
-static void e1000_send(void* data, size_t size);
+static void e1000_send(pkt_buff* pkt);
 
 /* MAC address */
 uint8_t MAC[6];
@@ -385,7 +385,7 @@ static void rx_poll(void) {
 }
 
 /* Send packets to the rx descriptors. */
-static void e1000_send(void* data, size_t size) {
+static void e1000_send(pkt_buff* pkt) {
 	/* Upon initialization of all rx descriptors, we set the DD bit in status to 1.
 	 * This is the same process the NIC writing back to descriptor after it has DMAed a 
 	 * tx buffer. We set this back to 0 once we write something new to buffer. */ 
@@ -400,10 +400,10 @@ static void e1000_send(void* data, size_t size) {
 		/* Map tails physical address to known virtual address, and copy the contents
 		 * of the memory over to this address. */
 		map_known(buff_addr);
-		memcpy(known, data, size);
+		memcpy(known, pkt -> data, pkt -> size);
 			
 		/* Set the size of the descriptor field. */
-		tail -> length = size;
+		tail -> length = pkt -> size;
 
 		/* Set relevant transmit descriptor command field bits. Also set DD to 0. */
 		tail -> cmd = TDESC_EOP | TDESC_IFCS | TDESC_RS;
@@ -412,6 +412,8 @@ static void e1000_send(void* data, size_t size) {
 		/* Increment tail and write this value to transmit descriptor tail */
 		tx_tail = (tx_tail + 1) % TX_DESCRIPTORS;
 		write_reg(TDT, tx_tail);
+
+		/* TODO: Free the packet buffer memory once sent */
 	} else {
 		/* In future, return a error */
 	}

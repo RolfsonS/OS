@@ -10,8 +10,16 @@
 #include <net/byteorder.h>
 #include <net/eth.h>
 #include <net/ip4.h>
+#include <net/net.h>
 
-#define ARP_CACHE_SIZE 10
+#define HT_ETH 		0x1
+#define PT_IP4		0x800
+#define HL_ETH 		0x6
+#define PL_IP4		0x4
+#define ARP_REQ		0x1
+#define ARP_REP		0x2
+
+#define ARP_CACHE_SIZE 	10
 
 /* Statically initialized ARP cache for now.
  * I want to look into creating a vector for this stuff, need to implement that and mem allocator.
@@ -113,33 +121,39 @@ static void arp_req() {
 }
 
 /* Send an ARP response packet */
-static void arp_res(arp_packet* packet) {
+static void arp_resp(pkt_buff* pkt) {
 	/* Create a new ARP packet, fill in the fields.
-	 * Requires us to obtain our IP and MAC addresses */
-	arp_packet* snd_pack = (arp_packet*) kmalloc(sizeof(arp_packet));
-
+	 * Requires us to obtain our IP and MAC addresses.
+	 *
+	 * Update 2026-10-24: No more kmalloc, reuse pkt_buff.*/
+	arp_packet* arp = (arp_packet*) pkt -> data;	
+	
 	/* Set hardware type, protocol type, hardware length, protocol length, op.
 	 * Remember, convert to network endianess */
-	snd_pack -> htype = htons(0x1);
-	snd_pack -> ptype = htons(0x0800);
-	snd_pack -> hlen = 0x6;
-	snd_pack -> plen = 0x4;
-	snd_pack -> oper = htons(0x2);
+	arp -> htype = htons(HT_ETH);
+	arp -> ptype = htons(PT_IP4);
+	arp -> hlen = HL_ETH;
+	arp -> plen = PL_IP4;
+	arp -> oper = htons(ARP_REP);
 
 	/* Sender Hardware and IP Addresses are ours.
 	 * --- Change get vs ret address calls. */
-	memcpy(snd_pack -> sha, get_mac(), sizeof(snd_pack -> sha));
-	memcpy(snd_pack -> spa, ret_ip(), sizeof(snd_pack -> spa));
+	memcpy(arp -> sha, get_mac(), sizeof(pkt -> MAC));
+	memcpy(arp -> spa, ret_ip(), sizeof(pkt -> IP));
 	
 	/* Target Hardware and IP addresses belong to requesting arp packet */
-	memcpy(snd_pack -> tha, packet -> sha, sizeof(snd_pack -> tha));
-	memcpy(snd_pack -> tpa, packet -> spa, sizeof(snd_pack -> tpa));
+	memcpy(arp -> tha, pkt -> MAC, sizeof(pkt -> MAC));
+	memcpy(arp -> tpa, pkt -> IP, sizeof(pkt -> IP));
+
+	/* Using pkt_buff*, add the network layer(2.5) type. 
+	 * As this is a response, also initialize the size. */
+	pkt -> n_type = NET_ARP;
+	pkt -> size = sizeof(arp_packet);
 
 	/* Pass this down to ethernet layer.
 	 * Eth layer needs to know destination MAC and size. */
- 	eth_send(packet -> sha, snd_pack, sizeof(arp_packet), ARP_ETH_TYPE);	
-
-	// print_arp_info(snd_pack);
+ 	eth_send(pkt);	
+	// print_arp_info((arp_packet*)pkt -> data);
 }
 
 /* Init first entry of ARP cache */
@@ -148,31 +162,31 @@ void init_arp_cache() {
 }
 
 void arp_recv(pkt_buff* pkt) {
-	/* Cast to ARP packet. Then , depending on the Operation field, we 
+	/* Cast to ARP packet. Then, depending on the Operation field, we 
 	 * know to either update ARP cache or create a response. */
-	arp_packet* packet = (arp_packet*) pkt -> data;
-	// print_arp_info(packet);
+	arp_packet* arp = (arp_packet*) pkt -> data;
+	// print_arp_info(arp);
 	
 	/* Regardless of whether this is meant for us or not, we still update ARP cache. */
-	arp_update_cache(packet);
+	/* We can also update this packets senders IP */
+	arp_update_cache(arp);
+	memcpy(pkt -> IP, arp -> spa, sizeof(pkt -> IP));
 
-	/* Then, verify IP address matches our IP.
+	/* Then, verify IP address matches our IP.x
 	 * IPv4 address is statically defined in ip4.c */
 	uint8_t* ip = ret_ip();
-	if(!memcmp(ip, packet -> spa, sizeof(packet -> spa))) {
+	if(!memcmp(ip, pkt -> IP, sizeof(pkt -> IP))) {
 		return;
 	}
 
 	/* Check to see if we have to repsond. */
-	if(ntohs(packet -> oper) & ARP_REQ) {
+	if(ntohs(arp -> oper) & ARP_REQ) {
 		/* Handle the ARP request. */
-		kprintf("Handling Request\n");
-		arp_res(packet);
+		arp_resp(pkt);
 	} 
 }
 
 /* Search the ARP cache for a MAC address (assume we have it for now) */
-
 uint8_t* search_arp_cache(void* ip) {
 	arp_cache_entry* cache_entry = arp_cache;
 
