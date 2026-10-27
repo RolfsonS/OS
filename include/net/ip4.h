@@ -1,3 +1,6 @@
+#ifndef IP4_H
+#define IP4_H
+
 /* Internet Procotol Version 4 */
 
 #define IP4_VER  	0x4
@@ -27,3 +30,5 @@ void ip4_recv(pkt_buff* pkt);
 void ip4_send(pkt_buff* pkt);
 
 uint8_t* ret_ip(void);
+
+#endif

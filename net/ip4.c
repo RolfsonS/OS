@@ -11,6 +11,7 @@
 #include <net/byteorder.h>
 #include <net/icmp.h>
 #include <net/net.h>
+#include <net/udp.h>
 
 /* Macros for certain IP4 packet fields */
 #define GET_VERSION(n)	((n) >> 4u)
@@ -36,6 +37,9 @@ typedef struct ip_proto_handler_t {
 static const ip_proto_handler handlers[IP_PROTOS] = {
 	[TRANS_ICMP] = {
 		.handler = icmp_recv,
+	},
+	[TRANS_UDP] = {
+		.handler = udp_recv,
 	},
 };
 
@@ -77,7 +81,7 @@ static void print_ip4_info(ip4_packet* packet) {
 /* Send an IP4 packet to Ethernet layer */
 void ip4_send(pkt_buff* pkt) {
 	/* Move head... and cast to an ip4 packet. */
-	pkt_buff_pull(pkt, sizeof(ip4_packet));
+	pkt_buff_push(pkt, sizeof(ip4_packet));
 	ip4_packet* ip4_pkt = (ip4_packet*) pkt -> data;
 
 	/* Set packet Meta data. */
@@ -105,7 +109,7 @@ void ip4_send(pkt_buff* pkt) {
 	/* Calculate the checksum. */
 	uint16_t chksm = htons(inet_checksum(ip4_pkt, sizeof(ip4_packet)));
 	ip4_pkt -> h_chksm = chksm;
-
+	kprintf("test...");
 	/* Send to ethernet layer. */
 	eth_send(pkt);
 }
@@ -126,7 +130,7 @@ void ip4_recv(pkt_buff* pkt) {
 	pkt -> trans_length = total_len - header_len;
 
 	/* Increment... FIX! */
-	pkt_buff_push(pkt, header_len);
+	pkt_buff_pull(pkt, header_len);
 
 	/* Call the relevant L4 Protocol. */
 	handlers[protocol].handler(pkt);

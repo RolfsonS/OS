@@ -13,7 +13,7 @@ SRCS = arch/i386/boot/boot.s \
        kernel/kernel.c \
        lib/kprintf.c lib/string.c \
        mm/heap.c mm/pmm.c \
-       net/eth.c net/arp.c net/ip4.c net/icmp.c
+       net/eth.c net/arp.c net/ip4.c net/icmp.c net/udp.c
 
 LINK = arch/i386/boot/linker.ld
 
