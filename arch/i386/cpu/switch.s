@@ -8,6 +8,9 @@
 /* void switch_to_task(thread_control_block* next_thread) */
 .global switch_to_task
 
+/* uint32_t fetch_CR3() */
+.global fetch_CR3
+
 switch_to_task:
 	/* Save the previous threads registers on its own stack. */
 	push %ebx
@@ -48,4 +51,9 @@ switch_to_task:
 	 pop %ebx
 
 	 /* Calling return restores the IP. */
-	 ret 
+	 ret
+
+
+fetch_CR3:
+	movl %cr3, %eax
+	ret
