@@ -3,6 +3,7 @@
 
 /* Task scheduling */
 
+
 /* Thread Control Block */
 typedef struct task_control_block_t {
 	/* Stack Top. */
@@ -12,7 +13,7 @@ typedef struct task_control_block_t {
 	void* CR3;
 	
 	/* Pointer to next task. */
-	task_control_block* next;
+	struct task_control_block_t* next;
 
 	/* Current state of this task. */
 	uint8_t state;

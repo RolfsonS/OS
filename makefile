@@ -6,11 +6,11 @@ CFLAGS = -std=gnu99 -ffreestanding -O2 -Wall -Wextra -g -Iinclude
 LDFLAGS = -ffreestanding -O2 -nostdlib
 
 SRCS = arch/i386/boot/boot.s \
-       arch/i386/cpu/gdt.c  arch/i386/cpu/gdt_setup.s arch/i386/cpu/idt.c arch/i386/cpu/idt_handlers.c arch/i386/cpu/idt_setup.s arch/i386/cpu/pic.c \
+       arch/i386/cpu/gdt.c  arch/i386/cpu/gdt_setup.s arch/i386/cpu/idt.c arch/i386/cpu/idt_handlers.c arch/i386/cpu/idt_setup.s arch/i386/cpu/pic.c arch/i386/cpu/switch.s\
        arch/i386/mm/vmm.c \
        arch/i386/io.c \
        drivers/pci/pci.c drivers/video/terminal.c drivers/net/e1000.c\
-       kernel/kernel.c \
+       kernel/kernel.c kernel/sched.c\
        lib/kprintf.c lib/string.c \
        mm/heap.c mm/pmm.c \
        net/eth.c net/arp.c net/ip4.c net/icmp.c net/udp.c

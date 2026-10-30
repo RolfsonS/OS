@@ -18,6 +18,8 @@
 
 #include <net/arp.h>
 #include <net/eth.h>
+
+#include <kernel/sched.h>
 // Check if the compiler things you are targeting the wrong operating system
 #if defined(__linux__)
 #error "You are not using a cross compiler"
@@ -43,8 +45,8 @@ void kernel_main(multiboot_info_t* mbd, uint32_t magic) {
 	init_heap();
 	init_pci();
 
-
 	init_arp_cache();
 
+	init_multitasking();
 	while(1){};
 }

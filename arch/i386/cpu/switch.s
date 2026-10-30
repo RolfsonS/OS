@@ -3,7 +3,7 @@
  * defined in sched.h. */
 
 .set TCB_ESP, 0
-.set TCP_CR3, 4
+.set TCB_CR3, 4
 
 /* void switch_to_task(thread_control_block* next_thread) */
 .global switch_to_task
@@ -11,20 +11,20 @@
 switch_to_task:
 	/* Save the previous threads registers on its own stack. */
 	push %ebx
-	push %ebi
+	push %esi
 	push %edi
 	push %ebp
 
 	/* Save the previous thread's (or current thread, we have not 
 	 * switched the stack yet) stack pointer */
-	movl current_task_TCB, %edi
+	movl current_TCB, %edi
 	movl %esp,TCB_ESP(%edi)
 
 	/* Update the current_task_TCB pointer... to be this one.
 	 * Go up 20 bytes considering 4 GPRs and EIP (pushed onto stack via
 	 * call). */
 	movl 20(%esp), %esi 
-	movl %esi, current_task_TCB
+	movl %esi, current_TCB
 
 	/* Load new stack pointer and prepare for TLB comparison */
 	movl TCB_ESP(%esi), %esp
@@ -39,7 +39,7 @@ switch_to_task:
 	je .SAMEVM
 	movl %eax, %cr3
 
-.SAMEVM
+.SAMEVM:
 	/* We are now back on the original stack, so restore all 
 	 * callee saved registers from last context switch. */
 	 pop %ebp
