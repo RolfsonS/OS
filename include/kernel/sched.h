@@ -31,6 +31,7 @@ typedef struct task_control_block_t {
  * kmalloc and create a new task_struct. */
 void init_multitasking();
 
-
+/* Task scheduling. */
+void schedule();
 
 #endif

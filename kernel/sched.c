@@ -15,6 +15,7 @@ task_control_block* current_TCB = NULL;
 /* Signature for assembly stub method. */
 extern void switch_to_task(task_control_block* next_task);
 extern uint32_t fetch_CR3();
+extern void irq_return();
 
 /* Based on some stack frame pointer, esp, print the first num_of_elements 
  * on the stack */
@@ -36,6 +37,10 @@ static void print_stack(uint32_t esp, uint32_t num_of_elements) {
  * Self preemption is the only form of process switching right now,
  * but in the future, schedule() will be called on a timer interrupt. */
 void schedule() {
+	if(current_TCB == NULL) {
+		return;
+	}
+
 	switch_to_task(current_TCB -> next);
 }
 
@@ -86,11 +91,33 @@ static task_control_block* init_TCB(void (*func)(void)) {
 	 * allocate a memory region for the new stack. 
 	 *
 	 * I originally made two major mistakes -- stack "grows" down, 
-	 * and you need to set esp to the "top" of the stack. */
+	 * and you need to set esp to the "top" of the stack.
+	 *
+	 * This has been modified to accomodate for interrupts. */
 	uint32_t* bottom_of_stack  = (uint32_t*) kmalloc(4096);
 	uint32_t* local_sp = bottom_of_stack + 1023;
-		
-	*local_sp = (uint32_t) func;
+	
+	/* CFLAGS set to allow interrupts again (See Intel SD Manual, pg 74).*/
+	uint32_t cflags = 0x202;
+	/* CS (code segment) -- Kernel Mode Code Segment */
+	uint32_t cs = 0x08;
+	/* "Recovering" from the interrupt take us to the correct func */
+	*local_sp = cflags;
+	*--local_sp = cs;
+	*--local_sp = (uint32_t) func;
+
+	/* popal expects all 8 GPRs to have value 0. */
+	*--local_sp = 0x0;
+	*--local_sp = 0x0;
+	*--local_sp = 0x0;
+	*--local_sp = 0x0;
+	*--local_sp = 0x0;
+	*--local_sp = 0x0;
+	*--local_sp = 0x0;
+	*--local_sp = 0x0;
+
+	/* Now we perform the operations switch_to_task expects to undo. */
+	*--local_sp = (uint32_t) irq_return;
 	*--local_sp = 0x0;
 	*--local_sp = 0x0;
 	*--local_sp = 0x0;

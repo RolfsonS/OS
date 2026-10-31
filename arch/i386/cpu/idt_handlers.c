@@ -26,7 +26,7 @@ void irq_0_handler(void) {
 	 * Send end of interrupt command - Pin 0. */
 	pic_sendEOI(0);
 
-
+	schedule();
 }
 
 void irq_1_handler(void) {

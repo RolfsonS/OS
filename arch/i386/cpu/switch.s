@@ -15,6 +15,10 @@
 .global disable_interrupts
 .global enable_interrupts
 
+/* At initialization of a thread, interrupts are disabled by the previous thread.
+ * So we have to simulate a return from an interrupt, and reenable them via EFLAGS register. */
+.global irq_return
+
 switch_to_task:
 	/* Save the previous threads registers on its own stack. */
 	push %ebx
@@ -67,5 +71,9 @@ disable_interrupts:
 	ret
 
 enable_interrupts:
-	sli
+	sti
 	ret
+
+irq_return:
+	popal
+	iret
