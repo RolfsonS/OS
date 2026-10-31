@@ -1,4 +1,4 @@
-	#include <stdint.h>
+#include <stdint.h>
 #include <stddef.h>
 
 #include <arch/i386/idt_handlers.h>
@@ -10,6 +10,7 @@
 
 #include <lib/kprintf.h>
 
+#include <kernel/sched.h>
 
 
 void general_idt_handler(void){
@@ -18,8 +19,14 @@ void general_idt_handler(void){
 }
 
 void irq_0_handler(void) {
-	/* Send end of interrupt command - Pin 0 */
+	/* Timer  interrupts are used for processor scheduling. *	
+	 * We send the EOI to PIC first, before task switching so we don't
+	 * run a single process forever. 
+	 *
+	 * Send end of interrupt command - Pin 0. */
 	pic_sendEOI(0);
+
+
 }
 
 void irq_1_handler(void) {

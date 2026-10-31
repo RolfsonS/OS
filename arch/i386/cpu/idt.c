@@ -22,6 +22,15 @@ extern void irq_11();
 /* An extern assembly function, need for using LIDT assembly command. */
 extern void idt_setup(uint32_t);
 
+/* Just a general overview of interrupts -- for the future. 
+ * An IRQ (Interrupt Request) hits CPU, either from hardware, or the CPU raises the request itself.
+ * This IRQ acts as an index into the IDT (Interrupt Descriptor Table), which contains an ISR
+ * (Interrupt Service Routine) to run. 
+ *
+ * It is important to note the bits 43-40 in the IDT Descriptor. 
+ * These determine whether other interrupts can essentially interrupt this interrupt.
+ * The distinction lies in inetrrupt vs. trap gates.
+ */
 uint64_t create_idt_descriptor(uint32_t offset, uint16_t selector, uint8_t info_byte){	
 	uint64_t descriptor;
 

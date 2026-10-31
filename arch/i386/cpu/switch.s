@@ -11,6 +11,10 @@
 /* uint32_t fetch_CR3() */
 .global fetch_CR3
 
+/* Enable/Disable interrupts, used for yield() */
+.global disable_interrupts
+.global enable_interrupts
+
 switch_to_task:
 	/* Save the previous threads registers on its own stack. */
 	push %ebx
@@ -56,4 +60,12 @@ switch_to_task:
 
 fetch_CR3:
 	movl %cr3, %eax
+	ret
+
+disable_interrupts:
+	cli
+	ret
+
+enable_interrupts:
+	sli
 	ret

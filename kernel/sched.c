@@ -29,9 +29,18 @@ static void print_stack(uint32_t esp, uint32_t num_of_elements) {
 	}
 }
 
-/* Allows the current task to preempt itself. */
-void yield() {
+
+/* schedule() will define the general logic for task scheduling.
+ * yield() gives the currently running process a chance to preempt itself.
+ *
+ * Self preemption is the only form of process switching right now,
+ * but in the future, schedule() will be called on a timer interrupt. */
+void schedule() {
 	switch_to_task(current_TCB -> next);
+}
+
+static void yield() {
+	schedule();
 }
 
 static void test_thread1() {
@@ -73,7 +82,7 @@ static task_control_block* init_TCB(void (*func)(void)) {
 	 * pointer that we want. 
 	 *
 	 * At intialization, also ensure that the first four 4 bytes values 
-	 * are 0, as we pop callee saved registers.The first step is to obviously 
+	 * are 0, as we pop all callee saved registers.The first step is to obviously 
 	 * allocate a memory region for the new stack. 
 	 *
 	 * I originally made two major mistakes -- stack "grows" down, 
