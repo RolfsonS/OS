@@ -50,24 +50,20 @@ static void yield() {
 
 static void test_thread1() {
 	/* Print, then switch task */
-	for(size_t i = 0; i < 5; i ++) {
+	for(;;) {
 		kprintf("Inside Task 1\n");
-		yield();
 	}
 
 	kprintf("Task 1 Completed \n");
-	yield();
 }
 
 static void test_thread2() {
 
-	for(size_t i = 0; i < 5; i++) {
+	for(;;) {
 		kprintf("Inside Task 2\n");
-		yield();
 	}
 
 	kprintf("Task 2 completed \n");
-	yield();
 }
 
 /* Initialize a TCB.
@@ -156,11 +152,9 @@ void init_multitasking() {
 	t1 -> next = t2;
 	t2 -> next = kthread_main;
 
-	for(size_t i = 0; i < 5; i++) {
+	for(;;) {
 		kprintf("Inside main thread \n");
-		yield();
 	}
-	yield();
 	kprintf("ALL DONE\n");
 }
 
