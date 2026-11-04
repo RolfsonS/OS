@@ -8,9 +8,15 @@
 
 #include <kernel/sched.h>
 
+/* Pointers the front and back of the ready queue */
+task_control_block* start = NULL;
+task_control_block* end = NULL;
+
+
 /* Global TCB representing the current thread. 
  * This thread is used primarily in switch_to_task. */
-task_control_block* current_TCB = NULL;
+task_control_block* current_TCB = start;
+
 
 /* Signature for assembly stub method. */
 extern void switch_to_task(task_control_block* next_task);
@@ -37,7 +43,7 @@ static void print_stack(uint32_t esp, uint32_t num_of_elements) {
  * Self preemption is the only form of process switching right now,
  * but in the future, schedule() will be called on a timer interrupt. */
 void schedule() {
-	if(current_TCB == NULL) {
+	if(current_TCB == NULL || current_tcb -> next == NULL ) {
 		return;
 	}
 
