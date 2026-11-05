@@ -15,13 +15,15 @@ task_control_block* end = NULL;
 
 /* Global TCB representing the current thread. 
  * This thread is used primarily in switch_to_task. */
-task_control_block* current_TCB = start;
+task_control_block* current_TCB = NULL;
 
 
 /* Signature for assembly stub method. */
 extern void switch_to_task(task_control_block* next_task);
 extern uint32_t fetch_CR3();
 extern void irq_return();
+extern void disable_interrupts();
+extern void enable_interrupts();
 
 /* Based on some stack frame pointer, esp, print the first num_of_elements 
  * on the stack */
@@ -43,10 +45,13 @@ static void print_stack(uint32_t esp, uint32_t num_of_elements) {
  * Self preemption is the only form of process switching right now,
  * but in the future, schedule() will be called on a timer interrupt. */
 void schedule() {
-	if(current_TCB == NULL || current_tcb -> next == NULL ) {
+	/* current_TCB == NULL implies threads have not yet been initialized.
+	 * start == end implies only one thread in READY queue. 
+	 * Then there is no need to context switch. */
+	if(current_TCB == NULL || start == end) {
 		return;
 	}
-
+	kprintf("Switch");
 	switch_to_task(current_TCB -> next);
 }
 
@@ -56,20 +61,24 @@ static void yield() {
 
 static void test_thread1() {
 	/* Print, then switch task */
-	for(;;) {
-		kprintf("Inside Task 1\n");
+	for(size_t i = 0; i < 100; i++) {
+		kprintf("1");
 	}
 
 	kprintf("Task 1 Completed \n");
+
+	finish();
 }
 
 static void test_thread2() {
 
-	for(;;) {
-		kprintf("Inside Task 2\n");
+	for(size_t i = 0; i < 100; i++) {
+		kprintf("2");
 	}
 
 	kprintf("Task 2 completed \n");
+
+	finish();
 }
 
 /* Initialize a TCB.
@@ -138,29 +147,79 @@ static task_control_block* init_TCB(void (*func)(void)) {
 	return tcb;
 } 
 
+/* Add a thread to the ready queue. */
+void add_ready(task_control_block* ready) {
+	/* Be aware, we are modifying the ready queue here.
+	 * A timer interrupt may hit this in a incomplete state if we do not
+	 * disable interrupts. */
+	ready -> state = READY;
+	disable_interrupts();
+	
+	/* Add this to the end of the READY queue */
+	end -> next = ready;
+	ready -> next = start;
+	ready -> prev = end;
+	end = ready;
+
+	/* Resume interrupts.
+	 * Task has now been added to READY Queue. */
+	enable_interrupts();
+}
+
+/* A task calls this itself, adds itself to the FINISH queue. 
+ *
+ * TODO: add a low priority thread that reaps finish queue. */
+void finish() {
+	/* Set state to FINISH, add to finish queue (in future). */
+	current_TCB -> state = FINISH;
+
+	/* FIXME: Thinking ahead to future... schedule requires -> next to exist
+	 * for current TCB. If we add this task to FINISH queue... and edit next, 
+	 * schedule will could potentially call a finished task.*/
+
+	/* Disable interrupts, remove from READY queue. */
+	disable_interrupts();
+	current_TCB -> prev -> next = current_TCB -> next;
+	current_TCB -> next -> prev = current_TCB -> prev;
+
+	/* If current TCB is end, set previous to end. */
+	if (current_TCB == end) end = current_TCB -> prev;
+	enable_interrupts();
+	
+	/* Wait until a switch occurs. */
+	for(;;);
+}
+void init_dummy() {
+	task_control_block* t1 = (task_control_block*) kmalloc(sizeof(task_control_block));
+	task_control_block* t2 = (task_control_block*) kmalloc(sizeof(task_control_block));
+
+	t1 = init_TCB(test_thread1);
+	t2 = init_TCB(test_thread2);
+
+	add_ready(t1);
+	add_ready(t2);
+}
+
 
 /* This function will be used to start multitasking */
 void init_multitasking() {
 	kprintf("Hello World\n");
 	
-	/* Create something easy for the main thread, i.e. the kernel boot
-	 * code (what we are in now... FIXME later) */
-	task_control_block* kthread_main = (task_control_block*) kmalloc(sizeof(task_control_block));
-	kthread_main -> CR3 = fetch_CR3();
+	/* The main boot stack task will be the first kernel task.
+	 * This thread is where immediate other threads are spawned from.
+	 *
+	 * As a result, this thread represents the first and last thread of READY queue.
+	 * It always remains the first (TODO: for now...). */
+	task_control_block* task_main = (task_control_block*) kmalloc(sizeof(task_control_block));
+	task_main -> CR3  = fetch_CR3();
+	task_main -> state = READY;
+	start = task_main;
+	end = task_main;
+	current_TCB = start;
 
-	/* Set current task to kthread_main and build out list.*/
-	current_TCB = kthread_main;
-
-	task_control_block* t1 = init_TCB(test_thread1);
-	task_control_block* t2 = init_TCB(test_thread2);
-
-	kthread_main -> next = t1;
-	t1 -> next = t2;
-	t2 -> next = kthread_main;
-
-	for(;;) {
-		kprintf("Inside main thread \n");
-	}
+	/* Initializing two dummy threads */
+	init_dummy();
+	
 	kprintf("ALL DONE\n");
 }
 

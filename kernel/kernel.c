@@ -48,5 +48,12 @@ void kernel_main(multiboot_info_t* mbd, uint32_t magic) {
 	init_arp_cache();
 
 	init_multitasking();
-	while(1){};
+
+	uint32_t i = 0;
+	while(1){
+		i++;
+		if (i % 10000 == 0) {
+			kprintf("7");
+		} 
+	};
 }

@@ -6,7 +6,7 @@
 /* State of a task */
 typedef enum task_state {
 	RUNNING,
-	READY,
+	READY, 
 	BLOCKED,
 	FINISH,
 } task_state;
@@ -19,8 +19,9 @@ typedef struct task_control_block_t {
 	/* CR3 -- holds page directory (Virtual Address Space). */
 	uint32_t CR3;
 	
-	/* Pointer to next task. */
+	/* Pointer to next and prev task. */
 	struct task_control_block_t* next;
+	struct task_control_block_t* prev;
 
 	/* Current state of this task. */
 	task_state state;
@@ -34,4 +35,9 @@ void init_multitasking();
 /* Task scheduling. */
 void schedule();
 
+/* Adding a task to the READY Queue */
+void add_ready();
+
+/* Remove a task from READY Queue */
+void finish();
 #endif
