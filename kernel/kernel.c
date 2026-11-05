@@ -49,11 +49,6 @@ void kernel_main(multiboot_info_t* mbd, uint32_t magic) {
 
 	init_multitasking();
 
-	uint32_t i = 0;
 	while(1){
-		i++;
-		if (i % 10000 == 0) {
-			kprintf("7");
-		} 
 	};
 }

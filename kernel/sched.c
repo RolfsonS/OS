@@ -46,9 +46,9 @@ static void print_stack(uint32_t esp, uint32_t num_of_elements) {
  * but in the future, schedule() will be called on a timer interrupt. */
 void schedule() {
 	/* current_TCB == NULL implies threads have not yet been initialized.
-	 * start == end implies only one thread in READY queue. 
+	 * current_TCB -> next == current_TCB implies only one thread in READY queue (init task). 
 	 * Then there is no need to context switch. */
-	if(current_TCB == NULL || start == end) {
+	if(current_TCB == NULL || current_TCB -> next == current_TCB) {
 		return;
 	}
 	kprintf("Switch");
@@ -216,6 +216,10 @@ void init_multitasking() {
 	start = task_main;
 	end = task_main;
 	current_TCB = start;
+
+	/* INIT the pointers of task_main */
+	task_main -> next = task_main;
+	task_main -> prev = task_main;
 
 	/* Initializing two dummy threads */
 	init_dummy();
