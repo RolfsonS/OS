@@ -8,10 +8,17 @@
 
 #include <kernel/sched.h>
 
+#define READY_QUEUES 32
+
 /* Pointers the front and back of the ready queue */
 task_control_block* start = NULL;
 task_control_block* end = NULL;
 
+/* Pointer to all the 32 task priority level's READY queues. 
+ *
+ * We also use a bitmap for indicating a task exist at that priority. */
+ready_queue* ready[READY_QUEUE];
+uint32_t priorities = 0x0;
 
 /* Global TCB representing the current thread. 
  * This thread is used primarily in switch_to_task. */

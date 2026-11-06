@@ -28,6 +28,13 @@ typedef struct task_control_block_t {
 
 } task_control_block;
 
+/* READY queue struct used at all priority levels. */
+typedef struct ready_queue_t {
+	task_control_block* head;
+	task_control_block* tail;
+} ready_queue;
+
+
 /* Intialize our kernel boot code.
  * kmalloc and create a new task_struct. */
 void init_multitasking();
