@@ -154,7 +154,10 @@ static task_control_block* init_TCB(void (*func)(void)) {
 	return tcb;
 } 
 
-/* Add a thread to the ready queue. */
+/* Add a thread to the ready queue.
+ *
+ * The ready uint32_t is the bitmap used for priority. This is set
+ * if we add a task to a READY queue that is */
 void add_ready(task_control_block* ready) {
 	/* Be aware, we are modifying the ready queue here.
 	 * A timer interrupt may hit this in a incomplete state if we do not
@@ -207,11 +210,15 @@ void init_dummy() {
 	add_ready(t2);
 }
 
+void init_ready_queues() {
+	
+
+}
 
 /* This function will be used to start multitasking */
 void init_multitasking() {
 	kprintf("Hello World\n");
-	
+
 	/* The main boot stack task will be the first kernel task.
 	 * This thread is where immediate other threads are spawned from.
 	 *
