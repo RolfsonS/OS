@@ -26,6 +26,8 @@ typedef struct task_control_block_t {
 	/* Current state of this task. */
 	task_state state;
 
+	/* Priority of the task. */
+	uint8_t priority;
 } task_control_block;
 
 /* READY queue struct used at all priority levels. */
@@ -43,7 +45,7 @@ void init_multitasking();
 void schedule();
 
 /* Adding a task to the READY Queue */
-void add_ready();
+void add_ready(task_control_block* ready_task, uint8_t priority);
 
 /* Remove a task from READY Queue */
 void finish();

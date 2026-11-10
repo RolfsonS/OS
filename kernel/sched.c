@@ -10,14 +10,10 @@
 
 #define READY_QUEUES 32
 
-/* Pointers the front and back of the ready queue */
-task_control_block* start = NULL;
-task_control_block* end = NULL;
-
 /* Pointer to all the 32 task priority level's READY queues. 
  *
  * We also use a bitmap for indicating a task exist at that priority. */
-ready_queue* ready[READY_QUEUE];
+ready_queue* ready[READY_QUEUES];
 uint32_t priorities = 0x0;
 
 /* Global TCB representing the current thread. 
@@ -31,6 +27,7 @@ extern uint32_t fetch_CR3();
 extern void irq_return();
 extern void disable_interrupts();
 extern void enable_interrupts();
+extern uint32_t highest_bit(uint32_t);
 
 /* Based on some stack frame pointer, esp, print the first num_of_elements 
  * on the stack */
@@ -45,6 +42,10 @@ static void print_stack(uint32_t esp, uint32_t num_of_elements) {
 	}
 }
 
+/* Extract the position of the highest priority forom the ready bitmap. */
+static uint32_t get_highest_priority(uint32_t priorities) {
+	return highest_bit(priorities);
+}
 
 /* schedule() will define the general logic for task scheduling.
  * yield() gives the currently running process a chance to preempt itself.
@@ -52,27 +53,37 @@ static void print_stack(uint32_t esp, uint32_t num_of_elements) {
  * Self preemption is the only form of process switching right now,
  * but in the future, schedule() will be called on a timer interrupt. */
 void schedule() {
-	/* current_TCB == NULL implies threads have not yet been initialized.
-	 * current_TCB -> next == current_TCB implies only one thread in READY queue (init task). 
-	 * Then there is no need to context switch. */
-	if(current_TCB == NULL || current_TCB -> next == current_TCB) {
+	/* current_TCB == NULL implies threads have not yet been initialized. */
+	if(current_TCB == NULL) {
 		return;
 	}
-	kprintf("Switch");
-	switch_to_task(current_TCB -> next);
+
+	/* We then check to see if a higher priority task was added to the READY queues. */
+	uint32_t highest = get_highest_priority(priorities);
+	if(current_TCB -> priority == highest) {
+
+		/* In this case, there is only one task at this priority, so no switch required. */
+		if(current_TCB -> next == current_TCB) return;
+		
+		/* If we remain in this priority, but not the only task, then switch. */
+		switch_to_task(current_TCB -> next);
+	} else {
+		/* Switch to the higher priority task. */
+		switch_to_task(ready[highest] -> head);
+	}
 }
 
 static void yield() {
 	schedule();
 }
 
-static void test_thread1() {
-	/* Print, then switch task */
+static void test_thread3() {
+
 	for(size_t i = 0; i < 100; i++) {
-		kprintf("1");
+		kprintf("3");
 	}
 
-	kprintf("Task 1 Completed \n");
+	kprintf("Task 3 completed \n");
 
 	finish();
 }
@@ -152,24 +163,71 @@ static task_control_block* init_TCB(void (*func)(void)) {
 	tcb -> CR3 = fetch_CR3();
 
 	return tcb;
-} 
+}
+
+static void test_thread1() {
+	/* Print, then switch task */
+	for(size_t i = 0; i < 100; i++) {
+		kprintf("1");
+	}
+	task_control_block* t3 = (task_control_block*) kmalloc(sizeof(task_control_block));
+
+	t3 = init_TCB(test_thread3);
+
+	add_ready(t3, 26);
+
+	yield();
+
+	kprintf("Task 1 Completed \n");
+
+	finish();
+}
+
+/* Toggle a 1 in the priorities bitmap. */
+static void set_priority_bm(uint8_t priority) {
+	uint32_t p_val = 1u << priority;
+	priorities |= p_val;
+}
+
+/* Reset a priority back to 0. */
+static void reset_priority_bm(uint8_t priority) {
+	uint32_t p_val = 1u << priority;
+	priorities &= ~p_val; 
+}
 
 /* Add a thread to the ready queue.
  *
  * The ready uint32_t is the bitmap used for priority. This is set
- * if we add a task to a READY queue that is */
-void add_ready(task_control_block* ready) {
+ * if we add a task to a READY queue that is currently empty. 
+ *
+ * It is also important to note that priorities are 0 - 31. */
+void add_ready(task_control_block* ready_task, uint8_t priority) {
 	/* Be aware, we are modifying the ready queue here.
 	 * A timer interrupt may hit this in a incomplete state if we do not
 	 * disable interrupts. */
-	ready -> state = READY;
+	ready_task -> state = READY;
+	ready_task -> priority = priority;
 	disable_interrupts();
 	
-	/* Add this to the end of the READY queue */
-	end -> next = ready;
-	ready -> next = start;
-	ready -> prev = end;
-	end = ready;
+	/* Pointer to the READY queue for this priority. */
+	ready_queue* r_queue = ready[priority];
+
+	/* Add this to the end of this priorities READY queue.
+	 *
+	 * In the case r_queue -> head == NULL, then this list is empty. 
+	 * So, just add that as the head.*/
+	if(r_queue -> head == NULL) {
+		r_queue -> head = ready_task;
+		ready_task -> next = ready_task;
+
+		/* This being NULL also implies that the bit has not been set. */
+		set_priority_bm(priority);
+	} else {
+		r_queue -> tail -> next = ready_task;
+		ready_task -> next = r_queue -> head;
+		ready_task -> prev = r_queue -> tail;
+	}
+	r_queue -> tail = ready_task;
 
 	/* Resume interrupts.
 	 * Task has now been added to READY Queue. */
@@ -189,16 +247,35 @@ void finish() {
 
 	/* Disable interrupts, remove from READY queue. */
 	disable_interrupts();
-	current_TCB -> prev -> next = current_TCB -> next;
-	current_TCB -> next -> prev = current_TCB -> prev;
+	
+	/* Pointer to the READY queue for this priority. */
+	ready_queue* r_queue = ready[current_TCB -> priority];
 
-	/* If current TCB is end, set previous to end. */
-	if (current_TCB == end) end = current_TCB -> prev;
+	/* The case where current_TCB -> next == current_TCB 
+	 * implies there is only one task at this priority level, so just
+	 * reset the head and tail pointers to NULL and fix bitmap.
+	 *
+	 * The other case is a little more involved. */
+	if(current_TCB -> next == current_TCB) {
+		r_queue -> head = NULL;
+		r_queue -> tail = NULL;
+		reset_priority_bm(current_TCB -> priority);
+	} else {
+		current_TCB -> prev -> next = current_TCB -> next;
+		current_TCB -> next -> prev = current_TCB -> prev;
+
+		/* If current TCB is end, set previous to end. */
+		if (current_TCB == r_queue -> tail) {
+			r_queue -> tail = current_TCB -> prev;
+		}
+	}
 	enable_interrupts();
 	
 	/* Wait until a switch occurs. */
 	for(;;);
 }
+
+
 void init_dummy() {
 	task_control_block* t1 = (task_control_block*) kmalloc(sizeof(task_control_block));
 	task_control_block* t2 = (task_control_block*) kmalloc(sizeof(task_control_block));
@@ -206,18 +283,26 @@ void init_dummy() {
 	t1 = init_TCB(test_thread1);
 	t2 = init_TCB(test_thread2);
 
-	add_ready(t1);
-	add_ready(t2);
+	add_ready(t1, 4);
+	add_ready(t2, 2);
 }
 
-void init_ready_queues() {
-	
-
+/* Initialize the ready queues for each priority. 
+ * This involves just setting the head and tail pointers to NULL. */
+static void init_ready_queues() {
+	for(size_t pos = 0; pos < READY_QUEUES; pos++) {
+		ready[pos] = (ready_queue*) kmalloc(sizeof(ready_queue));
+		ready[pos] -> head = NULL;
+		ready[pos] -> tail = NULL;
+	}
 }
 
 /* This function will be used to start multitasking */
 void init_multitasking() {
 	kprintf("Hello World\n");
+
+	/* Initialize all of the ready queues. */
+	init_ready_queues();
 
 	/* The main boot stack task will be the first kernel task.
 	 * This thread is where immediate other threads are spawned from.
@@ -226,14 +311,8 @@ void init_multitasking() {
 	 * It always remains the first (TODO: for now...). */
 	task_control_block* task_main = (task_control_block*) kmalloc(sizeof(task_control_block));
 	task_main -> CR3  = fetch_CR3();
-	task_main -> state = READY;
-	start = task_main;
-	end = task_main;
-	current_TCB = start;
-
-	/* INIT the pointers of task_main */
-	task_main -> next = task_main;
-	task_main -> prev = task_main;
+	add_ready(task_main, 0);
+	current_TCB = task_main;
 
 	/* Initializing two dummy threads */
 	init_dummy();

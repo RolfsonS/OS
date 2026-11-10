@@ -15,6 +15,9 @@
 .global disable_interrupts
 .global enable_interrupts
 
+/* Extract the highest bit using BSR */
+.global highest_bit
+
 /* At initialization of a thread, interrupts are disabled by the previous thread.
  * So we have to simulate a return from an interrupt, and reenable them via EFLAGS register. */
 .global irq_return
@@ -77,3 +80,7 @@ enable_interrupts:
 irq_return:
 	popal
 	iret
+
+highest_bit: 
+	bsrl 4(%esp), %eax
+	ret
