@@ -20,6 +20,8 @@ uint32_t priorities = 0x0;
  * This thread is used primarily in switch_to_task. */
 task_control_block* current_TCB = NULL;
 
+/* TODO: Add two pointers to two different ready queues, then switch between them when empty.
+ * This makes our scheduler more "fair". Right now, a low priority process may starve. */
 
 /* Signature for assembly stub method. */
 extern void switch_to_task(task_control_block* next_task);
