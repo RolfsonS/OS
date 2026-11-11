@@ -74,7 +74,6 @@ static void swap_queue(task_control_block* curr_task) {
 	/* It is important to note this is a combination of add_ready and finish.
 	 * This may seem wasteful now, but it prevents starvation for lower priority task.
 	 * When we also increase time slices for higher priority task, this will make more sense. */
-
 	/* Pointer to the READY queue for this priority. */
 	ready_queue* r_queue = current_q[curr_task -> priority];
 
@@ -83,9 +82,15 @@ static void swap_queue(task_control_block* curr_task) {
 		r_queue -> head = NULL;
 		r_queue -> tail = NULL;
 		reset_priority_bm(curr_task -> priority);
+		//if(curr_task -> priority) kprintf("RESET");
 	} else {
 		curr_task -> prev -> next = curr_task -> next;
 		curr_task -> next -> prev = curr_task -> prev;
+	
+		/* If current TCB is the head, set the next to head. */
+		if(current_TCB == r_queue -> head) {
+			r_queue -> head = current_TCB -> next;
+		}
 
 		/* If current TCB is end, set previous to end. */
 		if (curr_task == r_queue -> tail) {
@@ -102,6 +107,7 @@ static void swap_queue(task_control_block* curr_task) {
 		/* This being NULL also implies that the bit has not been set. */
 		set_priority_bm(curr_task -> priority, 0x0);
 	} else {
+		r_queue -> head -> prev = curr_task;
 		r_queue -> tail -> next = curr_task;
 		curr_task -> next = r_queue -> head;
 		curr_task -> prev = r_queue -> tail;
@@ -120,11 +126,15 @@ void schedule() {
 		return;
 	}
 
-	/* We need to swap the queue of the current task.*/
-	swap_queue(current_TCB);
-
 	/* If curr_prior == 0, then we have no task inside this set of queues.
-	 * So swap the priority, and swap the queue. */
+	 * So swap the priority, and swap the queue.
+	 *
+	 * It is also important to check the state before swapping the queue in the situation 
+	 * a task has finished, and state == FINISHED, we don't want to still swap. */
+	if(current_TCB -> state == READY) {
+		swap_queue(current_TCB);
+	}
+
 	if(curr_prior == 0x0) {
 		curr_prior = next_prior;
 		next_prior = 0x0;
@@ -156,16 +166,7 @@ static void test_thread3() {
 	finish();
 }
 
-static void test_thread2() {
 
-	for(size_t i = 0; i < 100; i++) {
-		kprintf("2");
-	}
-
-	kprintf("Task 2 completed \n");
-
-	finish();
-}
 
 /* Initialize a TCB.
  *
@@ -242,7 +243,7 @@ static void test_thread1() {
 
 	t3 = init_TCB(test_thread3);
 
-	add_ready(t3, 4);
+	add_ready(t3, 3);
 
 	yield();
 
@@ -251,7 +252,22 @@ static void test_thread1() {
 	finish();
 }
 
+static void test_thread2() {
 
+	for(size_t i = 0; i < 100; i++) {
+		kprintf("2");
+	}
+	task_control_block* t3 = (task_control_block*) kmalloc(sizeof(task_control_block));
+
+	t3 = init_TCB(test_thread3);
+
+	add_ready(t3, 3);
+
+	yield();
+	kprintf("Task 2 completed \n");
+
+	finish();
+}
 /* Add a thread to the ready queue.
  *
  * The ready uint32_t is the bitmap used for priority. This is set
@@ -262,12 +278,10 @@ void add_ready(task_control_block* ready_task, uint8_t priority) {
 	/* Be aware, we are modifying the ready queue here.
 	 * A timer interrupt may hit this in a incomplete state if we do not
 	 * disable interrupts. */
+	disable_interrupts();
 	ready_task -> state = READY;
 	ready_task -> priority = priority;
-	disable_interrupts();
 
-	kprintf("ADDED %d\n", ready_task -> priority);
-	
 	/* Pointer to the READY queue for this priority. */
 	ready_queue* r_queue = current_q[priority];
 
@@ -282,11 +296,12 @@ void add_ready(task_control_block* ready_task, uint8_t priority) {
 		/* This being NULL also implies that the bit has not been set. */
 		set_priority_bm(priority, 0x1);
 	} else {
+		r_queue -> head -> prev = ready_task;
 		r_queue -> tail -> next = ready_task;
-		//ready_task -> next = r_queue -> head;
-		//ready_task -> prev = r_queue -> tail;
+		ready_task -> next = r_queue -> head;
+		ready_task -> prev = r_queue -> tail;
 	}
-	//r_queue -> tail = ready_task;
+	r_queue -> tail = ready_task;
 
 	/* Resume interrupts.
 	 * Task has now been added to READY Queue. */
@@ -297,16 +312,16 @@ void add_ready(task_control_block* ready_task, uint8_t priority) {
  *
  * TODO: add a low priority thread that reaps finish queue. */
 void finish() {
-	/* Set state to FINISH, add to finish queue (in future). */
-	current_TCB -> state = FINISH;
-
 	/* FIXME: Thinking ahead to future... schedule requires -> next to exist
 	 * for current TCB. If we add this task to FINISH queue... and edit next, 
 	 * schedule will could potentially call a finished task.*/
 
 	/* Disable interrupts, remove from READY queue. */
 	disable_interrupts();
-	
+
+	/* Set state to FINISH, add to finish queue (in future). */
+	current_TCB -> state = FINISH;
+
 	/* Pointer to the READY queue for this priority. */
 	ready_queue* r_queue = current_q[current_TCB -> priority];
 
@@ -318,12 +333,18 @@ void finish() {
 	if(current_TCB -> next == current_TCB) {
 		r_queue -> head = NULL;
 		r_queue -> tail = NULL;
+
 		reset_priority_bm(current_TCB -> priority);
 	} else {
 		current_TCB -> prev -> next = current_TCB -> next;
 		current_TCB -> next -> prev = current_TCB -> prev;
+		
+		/* If current TCB is the head, set the next to head. */
+		if(current_TCB == r_queue -> head) {
+			r_queue -> head = current_TCB -> next;
+		}
 
-		/* If current TCB is end, set previous to end. */
+		/* If current TCB is tail, set previous to tail. */
 		if (current_TCB == r_queue -> tail) {
 			r_queue -> tail = current_TCB -> prev;
 		}
@@ -382,7 +403,8 @@ void init_multitasking() {
 
 	/* Initializing two dummy threads */
 	init_dummy();
-	
+
+	yield();
 	kprintf("ALL DONE\n");
 }
 
