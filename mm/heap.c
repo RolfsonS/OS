@@ -31,7 +31,7 @@ typedef struct kmem_slab_t {
 
 	/* Pointer to the next and previous slabs.
 	 * If we have to delete one, just remove from doubly linked list. */
-	struct kmem_slab* next, prev;
+	struct kmem_slab_t* next, prev;
 
 } kmem_slab;
 
@@ -54,7 +54,14 @@ typedef struct kmem_cache_t {
 /* kmem_caches is an array of kmem_cache objects. 
  * */
 kmem_cache kmem_caches[] = {
-		
+	{"kmem_cache_8", 8},
+	{"kmem_cache_16", 16},
+	{"kmem_cache_32", 32},
+	{"kmem_cache_64", 64},
+	{"kmem_cache_128", 128},
+	{"kmem_cache_256", 256},
+	{"kmem_cache_512", 512},
+	{"kmem_cache_1024", 1024},
 }
 
 uint32_t heap_start 	= 0xC1000000; 
