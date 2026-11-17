@@ -19,6 +19,9 @@
 /* Redefinition of kmem_cache for use inside kmem_slab. */
 typedef struct kmem_cache_t;
 
+/* Current number of kmem_caches that exist. */
+#define KMEM_CACHES		0x8
+
 /* kmem_slabs are placed at the start of an allocated slab. 
  * A free list is used to maintain what to allocate.
  * If all setups occur at kernel boot time, this is very cheap. */
@@ -68,6 +71,20 @@ uint32_t heap_start 	= 0xC1000000;
 uint32_t heap_curr	= 0xC1000000;
 uint32_t heap_end 	= 0xC1000000;
 
+/* Init all the caches. 
+ * This involves requesting and mapping memory, then carving the slabs into each of these pages.
+ * Each kmem_cache will intially start with only a single slab. 
+ *
+ * After this, if request can not be satisfied, additional pages are requested and mapped. */
+static void init_kmem_caches() {
+	
+	/* Interate through all kmem_caches, initializing the first slabs. */
+	for(size_t cache_num = 0; cache_num < KMEM_CACHES; cache_num++) {
+		add_slab(kmem_caches + cache_num);
+	}
+}
+
+
 void* kmalloc(size_t size) {
 	if(size == 0) {
 		return NULL;
@@ -92,6 +109,7 @@ void free(uint32_t* loc) {
 	//
 	*loc = 0x0;
 }
+
 
 
 void init_heap() {
