@@ -7,13 +7,14 @@
 #include <mm/pmm.h>
 
 #include <lib/kprintf.h>
+#include <lib/string.h>
 
 /* 11/15/2026 -- Rewriting this for a SLAB allocator.
  * I don't expect this to be super similar to Linux (obviously), but the current "bump" allocator 
  * is not sufficient.
  *
  * kmalloc acts as a wrapper for a bunch of kmem_caches, which each contain slabs.
- * As a result, kmalloc functionality should be maintained. 
+ * As a result, existing kmalloc functionality should be maintained. 
  * */
 
 /* Redefinition of kmem_cache for use inside kmem_slab. */
@@ -21,6 +22,14 @@ typedef struct kmem_cache_t;
 
 /* Current number of kmem_caches that exist. */
 #define KMEM_CACHES		0x8
+
+/* Starting location of the Kernel Heap.
+ * For now, this space is 0xC1000000 - 0xD0000000.*/
+#define KERNEL_HEAP_START 	0xC1000000u
+#define MAX_PAGES 		0x16800u
+
+/* Page Bitmap we use for allocations. */
+static uint8_t page_bitmap[MAX_PAGES];
 
 /* kmem_slabs are placed at the start of an allocated slab. 
  * A free list is used to maintain what to allocate.
@@ -56,7 +65,7 @@ typedef struct kmem_cache_t {
 
 /* kmem_caches is an array of kmem_cache objects. 
  * */
-kmem_cache kmem_caches[] = {
+static kmem_cache kmem_caches[] = {
 	{"kmem_cache_8", 8},
 	{"kmem_cache_16", 16},
 	{"kmem_cache_32", 32},
@@ -67,9 +76,95 @@ kmem_cache kmem_caches[] = {
 	{"kmem_cache_1024", 1024},
 }
 
+/* FIXME: For now, these stay, until I fix the allocator. */
 uint32_t heap_start 	= 0xC1000000; 
 uint32_t heap_curr	= 0xC1000000;
 uint32_t heap_end 	= 0xC1000000;
+
+/* Bitmap specfic helper functions. */
+
+/* Intialize the page bitmap to all 0's meaning */
+static void init_page_bitmap() {
+	memset(page_bitmap, 0xFF, MAX_PAGES);
+}
+
+/* Set a bit to 0 in the bitmap, indicating it has been allocated. */
+static void set_bit_alloc(uint32_t page) {
+	/* Divide page by 8 * 4 KB to find which byte to use. 
+	 * Divide page by 4 KB, and % 8 which tells us the entry bit. */
+	uint8_t bitmap_byte	 = page / 0x8000;
+	uint8_t bitmap_bit 	 = (page / 0x1000) % 0x8;
+
+	/* Base on the entry bit, shift 1000 0000 to the right, and OR bitmap. */
+	uint8_t bitmap_mask 	 = 0x80u >> bitmap_byte;
+	page_bitmap[bitmap_byte] |= bitmap_mask;
+}
+
+/* Set a bit to 1 in the bitmap, indicating it has been freed. */
+static void set_bit_free(uint32_t page) {
+	/* Repeat the same process as above, obviously this time setting to 0. */
+	uint8_t bitmap_byte	 = page / 0x8000;
+	uint8_t bitmap_bit 	 = (page / 0x1000) % 0x8;
+	uint8_t bitmap_mask 	 = 0x80u >> bitmap_byte;
+	page_bitmap[bitmap_byte] &= ~bitmap_mask;
+}
+
+/* Scans through the bitmap looking for a 1.
+ * Returns the corresponding memory address. */
+static uint32_t* find_free_page() {
+	/* Loop through all the bytes in the bitmap. 
+	 * It is important to remember each byte represents 8 * 4 KB = 32 KB,
+	 * so logic at the bit level is required to find a specific page. */
+	for(size_t curr_byte = 0; curr_byte < MAX_PAGES; curr_byte++) {
+		uint8_t count = 0;
+		
+		/* Iterate throught the bits. */
+		for(int8_t curr_bit = 7; curr_bit >= 0; curr_bit--) {
+			
+			/* Conditional implies free page. */
+			if((bitmap[curr_byte]>> curr_bit) & 0x1) {
+				/* Obtain the memeory address. */
+				uint32_t free_address = (curr_byte * 0x8000);
+				free_address += (count * 0x1000);
+				
+				/* Change out bitmap to mark this as allocated. */
+				set_bit_alloc(free_address);
+
+				/* Return free address (Pointer makes it more memory-y) */
+				return (uint32_t*) free_address;
+			}
+			count++;
+		}
+
+		/* If nothing found, return NULL. */
+		return NULL;
+}
+
+
+/* General page allocation and deallocation. */
+
+/* Return a "memory address" to the start of a page.
+ * This function is used for allocated full pages. It is the only
+ * interface the add_slab function will see. 
+ * So, any additional functional that is later added to determine how the PMM and VMM 
+ * allocate pages is done at this function and below. 
+ *
+ * A bitmap is used to determine a page to allocate, starting at the kernel heap address. */
+static uint32_t* page_alloc() {
+		
+	/* Obtain a free virtual page location from bitmap then map this page. */
+	
+}	
+
+
+/* SLAB allocator heavy lifters. */
+
+/* Add a slab to the empty queue for the repsective cache. 
+ * We also chop up the entire slab.
+ * */
+static void add_slab(kmem_cache* cache) {
+	
+}
 
 /* Init all the caches. 
  * This involves requesting and mapping memory, then carving the slabs into each of these pages.
@@ -77,7 +172,9 @@ uint32_t heap_end 	= 0xC1000000;
  *
  * After this, if request can not be satisfied, additional pages are requested and mapped. */
 static void init_kmem_caches() {
-	
+	/* Zero the bitmap. */
+	init_page_bitmap();
+
 	/* Interate through all kmem_caches, initializing the first slabs. */
 	for(size_t cache_num = 0; cache_num < KMEM_CACHES; cache_num++) {
 		add_slab(kmem_caches + cache_num);
