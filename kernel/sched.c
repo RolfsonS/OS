@@ -152,21 +152,12 @@ void schedule() {
 }
 
 static void yield() {
+	/* A bug was discovered around this code for permanently disabling interrupts.
+	 * Instead, protecting this schedule call is correct. */
+	disable_interrupts();
 	schedule();
+	enable_interrupts();
 }
-
-static void test_thread3() {
-
-	for(size_t i = 0; i < 100; i++) {
-		kprintf("3");
-	}
-
-	kprintf("Task 3 completed \n");
-
-	finish();
-}
-
-
 
 /* Initialize a TCB.
  *
@@ -234,40 +225,6 @@ static task_control_block* init_TCB(void (*func)(void)) {
 	return tcb;
 }
 
-static void test_thread1() {
-	/* Print, then switch task */
-	for(size_t i = 0; i < 100; i++) {
-		kprintf("1");
-	}
-	task_control_block* t3 = (task_control_block*) kmalloc(sizeof(task_control_block));
-
-	t3 = init_TCB(test_thread3);
-
-	add_ready(t3, 3);
-
-	yield();
-
-	kprintf("Task 1 Completed \n");
-
-	finish();
-}
-
-static void test_thread2() {
-
-	for(size_t i = 0; i < 100; i++) {
-		kprintf("2");
-	}
-	task_control_block* t3 = (task_control_block*) kmalloc(sizeof(task_control_block));
-
-	t3 = init_TCB(test_thread3);
-
-	add_ready(t3, 3);
-
-	yield();
-	kprintf("Task 2 completed \n");
-
-	finish();
-}
 /* Add a thread to the ready queue.
  *
  * The ready uint32_t is the bitmap used for priority. This is set
@@ -355,18 +312,6 @@ void finish() {
 	for(;;);
 }
 
-
-void init_dummy() {
-	task_control_block* t1 = (task_control_block*) kmalloc(sizeof(task_control_block));
-	task_control_block* t2 = (task_control_block*) kmalloc(sizeof(task_control_block));
-
-	t1 = init_TCB(test_thread1);
-	t2 = init_TCB(test_thread2);
-
-	add_ready(t1, 4);
-	add_ready(t2, 4);
-}
-
 /* Initialize the ready queues for each priority. 
  * This involves just setting the head and tail pointers to NULL. */
 static void init_ready_queues() {
@@ -401,10 +346,6 @@ void init_multitasking() {
 	add_ready(task_main, 0);
 	current_TCB = task_main;
 
-	/* Initializing two dummy threads */
-	init_dummy();
-
-	yield();
 	kprintf("ALL DONE\n");
 }
 

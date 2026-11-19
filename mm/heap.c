@@ -27,6 +27,7 @@ typedef struct kmem_cache_t;
  * For now, this space is 0xC1000000 - 0xD0000000.*/
 #define KERNEL_HEAP_START 	0xC1000000u
 #define MAX_PAGES 		0x16800u
+#define PAGE_SIZE 	 	0x1000
 
 /* Page Bitmap we use for allocations. */
 static uint8_t page_bitmap[MAX_PAGES];
@@ -43,7 +44,8 @@ typedef struct kmem_slab_t {
 
 	/* Pointer to the next and previous slabs.
 	 * If we have to delete one, just remove from doubly linked list. */
-	struct kmem_slab_t* next, prev;
+	struct kmem_slab_t* next;
+	struct kmem_slab_t* prev;
 
 } kmem_slab;
 
@@ -51,15 +53,17 @@ typedef struct kmem_slab_t {
  * based on whatever slab is free.
  * */
 typedef struct kmem_cache_t {
+	/* Name of the cache. */
+	const char* cache_name;
+
 	/* The size of this cache level, meaning an allocated chunk takes up
 	 * this much memory */
 	uint16_t size;
 
-	/* Name of the cache. */
-	const char* cache_name;
-
 	/* Pointers to empty, full, and partially used slabs. */
-	kmem_slab* empty, full, partial;
+	kmem_slab* empty; 
+	kmem_slab* full;
+	kmem_slab* partial;
 
 } kmem_cache;
 
@@ -74,7 +78,7 @@ static kmem_cache kmem_caches[] = {
 	{"kmem_cache_256", 256},
 	{"kmem_cache_512", 512},
 	{"kmem_cache_1024", 1024},
-}
+};
 
 /* FIXME: For now, these stay, until I fix the allocator. */
 uint32_t heap_start 	= 0xC1000000; 
@@ -122,7 +126,7 @@ static uint32_t* find_free_page() {
 		for(int8_t curr_bit = 7; curr_bit >= 0; curr_bit--) {
 			
 			/* Conditional implies free page. */
-			if((bitmap[curr_byte]>> curr_bit) & 0x1) {
+			if((page_bitmap[curr_byte]>> curr_bit) & 0x1) {
 				/* Obtain the memeory address. */
 				uint32_t free_address = (curr_byte * 0x8000);
 				free_address += (count * 0x1000);
@@ -135,9 +139,9 @@ static uint32_t* find_free_page() {
 			}
 			count++;
 		}
-
-		/* If nothing found, return NULL. */
-		return NULL;
+	}
+	/* If nothing found, return NULL. */
+	return NULL;
 }
 
 
@@ -152,8 +156,14 @@ static uint32_t* find_free_page() {
  * A bitmap is used to determine a page to allocate, starting at the kernel heap address. */
 static uint32_t* page_alloc() {
 		
-	/* Obtain a free virtual page location from bitmap then map this page. */
-	
+	/* Obtain a free virtual page location from bitmap and mark allocated.*/
+	uint32_t* base_page_address = find_free_page();
+	set_bit_alloc((uint32_t)base_page_address);
+
+	/* Obtain correct virtual address and memory map. */
+	uint32_t final_page_address = KERNEL_HEAP_START + (uint32_t) base_page_address;
+	map_page(final_page_address, (uint32_t) allocate_page(), P | RW);
+	return (uint32_t*)final_page_address;
 }	
 
 
@@ -161,10 +171,37 @@ static uint32_t* page_alloc() {
 
 /* Add a slab to the empty queue for the repsective cache. 
  * We also chop up the entire slab.
- * */
+ * TODO: BIG SLABS??? I like this entry from the paper I read:
+ * "Therefore, for large objects the physical layout is identical to the logical layout.
+ * The required slab and bufctl data structures come from their own (small-object!) caches"
+ **/
 static void add_slab(kmem_cache* cache) {
-	
-}
+	/* First, we request some memory and then cast this to a kmem_slab*. */
+	uint32_t* slab_address = page_alloc();
+	kmem_slab* slab = (kmem_slab*) slab_address;
+	slab -> free = NULL;
+	slab -> parent_cache = cache;
+	slab -> next = NULL;
+	slab -> prev = NULL;
+
+	/* Find the first 8 byte aligned address to begin chopping the block up at. */
+	uint8_t starting_free_offset = ((sizeof(kmem_slab) + 8) / 8) * 8;
+	uint32_t starting_free_addr = starting_free_offset + (uint32_t) slab_address;
+
+	/* The condtion in this for loop is a little cumbersom.
+	 * Essentially, left of <=, we do not want to potentially overwrite the next page in 
+	 * virtual memory. To the right, we know the size of a 4KB page (4KB) and where this slab starts,
+	 * so don't go past that. We then increment by our required allocation size. */
+	for(uint32_t curr_addr = starting_free_addr;
+			curr_addr + (cache -> size) <= PAGE_SIZE + (uint32_t) slab_address;
+			curr_addr += cache -> size) {
+
+
+	}
+
+
+
+}		
 
 /* Init all the caches. 
  * This involves requesting and mapping memory, then carving the slabs into each of these pages.
@@ -177,6 +214,14 @@ static void init_kmem_caches() {
 
 	/* Interate through all kmem_caches, initializing the first slabs. */
 	for(size_t cache_num = 0; cache_num < KMEM_CACHES; cache_num++) {
+		/* Initialize the first fields of the cache. 
+		 * size and cache_name are already intialized.*/
+		kmem_cache* curr_cache = kmem_caches + cache_num;
+		curr_cache -> empty = NULL;
+		curr_cache -> full = NULL;
+		curr_cache -> partial = NULL;
+
+		/* Initialize the first slab, which belongs to this caches empty by default. */
 		add_slab(kmem_caches + cache_num);
 	}
 }
@@ -212,4 +257,11 @@ void free(uint32_t* loc) {
 void init_heap() {
 	map_page(heap_start, (uint32_t)allocate_page(), P | RW);
 	heap_end += 0x1000;
+        uint32_t* addr = page_alloc();
+	*addr = 8;
 }
+
+		
+
+
+
