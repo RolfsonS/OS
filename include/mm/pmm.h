@@ -37,12 +37,6 @@ void* free_pmm(uint32_t page);
  */
 void* allocate_pmm(uint32_t page);
 
-/* Prints the represented byte at a memory location.
- *
- * Param: uint32_t memory_loc, the location in memory to print
- */
-void print_byte(uint32_t memory_loc);
-
 /* Used to find the start of the nearest page.
  *
  * Param: uint32_t curr_addr, the curr_addr, used to round up

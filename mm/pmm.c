@@ -101,7 +101,7 @@ void* allocate_pmm(uint32_t page) {
 	return (void*) page;
 }
 
-void print_byte(uint32_t memory_loc) {
+static void print_byte(uint32_t memory_loc) {
 	uint32_t entry_byte = memory_loc / 0x8000;
 	uint32_t entry_bit = (memory_loc / 0x1000) % 0x8;
 	 

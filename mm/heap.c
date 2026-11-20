@@ -32,13 +32,29 @@ typedef struct kmem_cache_t;
 /* Page Bitmap we use for allocations. */
 static uint8_t page_bitmap[MAX_PAGES];
 
+/* Enum used to track the states of a cache. 
+ * This is helpful as it allows us to distinguish between a 
+ * newly allocated slab and an used, now empty slab.
+ *
+ * This is help, as if we want a thread to clean/deallocate a slab,
+ * we need to be able to tell the difference. */
+typedef enum slab_state_t {
+	NEW = 0x0,
+	IN_USE = 0x1,
+	USED = 0x2
+} slab_state;
+
+
 /* kmem_slabs are placed at the start of an allocated slab. 
  * A free list is used to maintain what to allocate.
  * If all setups occur at kernel boot time, this is very cheap. */
 typedef struct kmem_slab_t {
 	/* A pointer to the first free memory location. */
 	uint32_t* free;
-	
+
+	/* Current state of this slab. */
+	slab_state state;
+
 	/* Pointer to the kmem_cache that owns this slab. */
 	struct kmem_cache_t* parent_cache;
 
@@ -92,25 +108,33 @@ static void init_page_bitmap() {
 	memset(page_bitmap, 0xFF, MAX_PAGES);
 }
 
+/* Print the allocation/free status of a set of 8 pages via bitmap. */
+static void print_byte(uint32_t page) {
+	uint32_t bitmap_byte 	= page / 0x8000;
+	uint8_t info_byte = page_bitmap[bitmap_byte];
+
+	kprintf("BYTE: %b\n", info_byte);
+}
+
 /* Set a bit to 0 in the bitmap, indicating it has been allocated. */
 static void set_bit_alloc(uint32_t page) {
 	/* Divide page by 8 * 4 KB to find which byte to use. 
 	 * Divide page by 4 KB, and % 8 which tells us the entry bit. */
-	uint8_t bitmap_byte	 = page / 0x8000;
+	uint32_t bitmap_byte	 = page / 0x8000;
 	uint8_t bitmap_bit 	 = (page / 0x1000) % 0x8;
 
 	/* Base on the entry bit, shift 1000 0000 to the right, and OR bitmap. */
-	uint8_t bitmap_mask 	 = 0x80u >> bitmap_byte;
-	page_bitmap[bitmap_byte] |= bitmap_mask;
+	uint8_t bitmap_mask 	 = 0x80u >> bitmap_bit;
+	page_bitmap[bitmap_byte] &= ~bitmap_mask;
 }
 
 /* Set a bit to 1 in the bitmap, indicating it has been freed. */
 static void set_bit_free(uint32_t page) {
 	/* Repeat the same process as above, obviously this time setting to 0. */
-	uint8_t bitmap_byte	 = page / 0x8000;
+	uint32_t bitmap_byte	 = page / 0x8000;
 	uint8_t bitmap_bit 	 = (page / 0x1000) % 0x8;
-	uint8_t bitmap_mask 	 = 0x80u >> bitmap_byte;
-	page_bitmap[bitmap_byte] &= ~bitmap_mask;
+	uint8_t bitmap_mask 	 = 0x80u >> bitmap_bit;
+	page_bitmap[bitmap_byte] |= bitmap_mask;
 }
 
 /* Scans through the bitmap looking for a 1.
@@ -185,22 +209,39 @@ static void add_slab(kmem_cache* cache) {
 	slab -> prev = NULL;
 
 	/* Find the first 8 byte aligned address to begin chopping the block up at. */
-	uint8_t starting_free_offset = ((sizeof(kmem_slab) + 8) / 8) * 8;
+	uint8_t starting_free_offset = ((sizeof(kmem_slab) + 7) / 8) * 8;
 	uint32_t starting_free_addr = starting_free_offset + (uint32_t) slab_address;
 
-	/* The condtion in this for loop is a little cumbersom.
+	/* Set the first free block in the slab. */
+	slab -> free = (uint32_t*) starting_free_addr;
+	kprintf("Start: %x \n", slab -> free);
+
+	/* The condtion in this for loop is a little cumbersome.
 	 * Essentially, left of <=, we do not want to potentially overwrite the next page in 
 	 * virtual memory. To the right, we know the size of a 4KB page (4KB) and where this slab starts,
 	 * so don't go past that. We then increment by our required allocation size. */
 	for(uint32_t curr_addr = starting_free_addr;
 			curr_addr + (cache -> size) <= PAGE_SIZE + (uint32_t) slab_address;
 			curr_addr += cache -> size) {
-
-
+		/* Cast current address to a pointer. This makes more intuitive sense. 
+		 * Then, we can dereference it, and put a memory location there, that is,
+		 * a pointer to the next free adress. */
+		uint32_t* curr_free = (uint32_t*) curr_addr;
+		*curr_free = curr_addr + cache -> size;
 	}
 
+	/* For debugging -- print the first few cache lines. */
+	/*for(size_t i = 0; i < 5; i++) {
+		uint32_t *curr = (uint32_t*) starting_free_addr;
+		kprintf("CURR: %x\n", *curr);
 
+		starting_free_addr += cache -> size;
+		curr = (uint32_t*) starting_free_addr;
+	}*/
 
+	/* Add this slab to the parent caches empty queue. */
+	slab -> parent_cache -> empty = slab;
+	slab -> state = NEW;
 }		
 
 /* Init all the caches. 
@@ -226,6 +267,17 @@ static void init_kmem_caches() {
 	}
 }
 
+/* Return the first memory segment from the current kmem_cache. */
+static void* kmem_cache_alloc(kmem_cache* curr_cache) {
+	/* If the current cache has a partial queue, prefer that.
+	 * CPU caches will treat us a little better. */
+	if(!curr_cache -> partial) {
+		kprintf("PARTIAL\n");
+	}
+
+	return (void*) NULL;
+}
+
 
 void* kmalloc(size_t size) {
 	if(size == 0) {
@@ -245,6 +297,23 @@ void* kmalloc(size_t size) {
 }
 
 
+/* Fake function we are using for now... this will eventually replace kmalloc. */
+void* fake_kmalloc(size_t size) {
+	/* If size == 0, they asked for no memory, so return NULL. */
+	if(size == 0) {
+		return NULL;
+	}
+
+	/* Find the cache with the smallest chunk that fits this request. */
+	for(size_t cache_num = 0; cache_num < KMEM_CACHES; cache_num++) {
+		kmem_cache* curr_cache = kmem_caches + cache_num;
+		if(curr_cache -> size >= size) {
+			return kmem_cache_alloc(curr_cache);
+		}
+	}
+
+	return (void*) NULL;
+}
 
 void free(uint32_t* loc) {	
 	// Doing nothing rn lol
@@ -257,8 +326,9 @@ void free(uint32_t* loc) {
 void init_heap() {
 	map_page(heap_start, (uint32_t)allocate_page(), P | RW);
 	heap_end += 0x1000;
-        uint32_t* addr = page_alloc();
-	*addr = 8;
+
+	init_kmem_caches();
+	(void*) fake_kmalloc(8);
 }
 
 		
