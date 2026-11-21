@@ -240,7 +240,8 @@ static void add_slab(kmem_cache* cache) {
 	}*/
 
 	/* Add this slab to the parent caches empty queue. */
-	slab -> parent_cache -> empty = slab;
+	// FIXME: Change back to slab -> parent_cache -> empty = slab!
+	slab -> parent_cache -> partial = slab;
 	slab -> state = NEW;
 }		
 
@@ -267,13 +268,29 @@ static void init_kmem_caches() {
 	}
 }
 
+/* Scan the partial slab, looking for a free address to return. 
+ * Also, consider the case where we have to add this slab to the full list. */
+static void* scan_partial_slab(kmem_cache* curr_cache) {
+	/* Assume we can not find something to begin with. */
+	uint32_t* partial_addr = NULL;
+	kmem_slab* partial = curr_cache -> partial;
+	if(partial) {
+		partial_addr = partial -> free;
+	}
+
+	/* Logic for removing this slab from the partial slab if that slab becomes full. */
+	//if(partial_addr) {
+	//	if(*partial_addr 
+	kprintf("ADDR: %x", *partial_addr);
+
+	return (void*) NULL;
+}	
+
 /* Return the first memory segment from the current kmem_cache. */
 static void* kmem_cache_alloc(kmem_cache* curr_cache) {
 	/* If the current cache has a partial queue, prefer that.
 	 * CPU caches will treat us a little better. */
-	if(!curr_cache -> partial) {
-		kprintf("PARTIAL\n");
-	}
+	(void) scan_partial_slab(curr_cache);
 
 	return (void*) NULL;
 }
