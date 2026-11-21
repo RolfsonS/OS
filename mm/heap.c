@@ -221,7 +221,7 @@ static void add_slab(kmem_cache* cache) {
 	 * virtual memory. To the right, we know the size of a 4KB page (4KB) and where this slab starts,
 	 * so don't go past that. We then increment by our required allocation size. */
 	for(uint32_t curr_addr = starting_free_addr;
-			curr_addr + (cache -> size) <= PAGE_SIZE + (uint32_t) slab_address;
+			curr_addr + (cache -> size) <=        PAGE_SIZE + (uint32_t) slab_address;
 			curr_addr += cache -> size) {
 		/* Cast current address to a pointer. This makes more intuitive sense. 
 		 * Then, we can dereference it, and put a memory location there, that is,
@@ -277,7 +277,11 @@ static void* scan_partial_slab(kmem_cache* curr_cache) {
 	if(partial) {
 		partial_addr = partial -> free;
 	}
-
+	
+	/* TODO: Two issues I imagine:
+	 * 	1. Checking to verify the last address is allocated 
+	 * 		- If so, need to create a new slab.
+	 * 	2. Checking to verify the last address in a block is allocated (but could be in middle). 
 	/* Logic for removing this slab from the partial slab if that slab becomes full. */
 	//if(partial_addr) {
 	//	if(*partial_addr 
