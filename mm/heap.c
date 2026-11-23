@@ -9,6 +9,35 @@
 #include <lib/kprintf.h>
 #include <lib/string.h>
 
+// #define DEBUG_HEAP_SLAB
+#define DEBUG_HEAP_PARTIAL
+#define DEBUG_HEAP_EMPTY
+#define DEBUG_HEAP_KMEMCA
+
+#ifdef DEBUG_HEAP_SLAB 
+	#define heap_debug_slab(...) kprintf(__VA_ARGS__)
+#else
+	#define heap_debug_slab(...) do { } while (0)
+#endif
+
+#ifdef DEBUG_HEAP_PARTIAL 
+	#define heap_debug_partial(...) kprintf(__VA_ARGS__)
+#else
+	#define heap_debug_partial(...) do { } while (0)
+#endif
+
+#ifdef DEBUG_HEAP_EMPTY
+	#define heap_debug_empty(...) kprintf(__VA_ARGS__)
+#else
+	#define heap_debug_empty(...) do { } while (0)
+#endif
+
+#ifdef DEBUG_HEAP_KMEMCA
+	#define heap_debug_kmemca(...) kprintf(__VA_ARGS__)
+#else
+	#define heap_debug_kmemca(...) do { } while (0)
+#endif
+
 /* 11/15/2026 -- Rewriting this for a SLAB allocator.
  * I don't expect this to be super similar to Linux (obviously), but the current "bump" allocator 
  * is not sufficient.
@@ -214,15 +243,16 @@ static void add_slab(kmem_cache* cache) {
 
 	/* Set the first free block in the slab. */
 	slab -> free = (uint32_t*) starting_free_addr;
-	kprintf("Start: %x \n", slab -> free);
+	heap_debug_slab("Start: %x \n", slab -> free);
 
-	/* The condtion in this for loop is a little cumbersome.
-	 * Essentially, left of <=, we do not want to potentially overwrite the next page in 
+	/* Compute the final allocatable address for this slab. */
+	uint32_t final_addr = (PAGE_SIZE + (uint32_t) slab_address) - (cache -> size << 1);
+
+	/* Essentially, left of <=, we do not want to potentially overwrite the next page in 
 	 * virtual memory. To the right, we know the size of a 4KB page (4KB) and where this slab starts,
 	 * so don't go past that. We then increment by our required allocation size. */
-	for(uint32_t curr_addr = starting_free_addr;
-			curr_addr + (cache -> size) <=        PAGE_SIZE + (uint32_t) slab_address;
-			curr_addr += cache -> size) {
+	uint32_t curr_addr = starting_free_addr;
+	for(;curr_addr <= final_addr; curr_addr += cache -> size) {
 		/* Cast current address to a pointer. This makes more intuitive sense. 
 		 * Then, we can dereference it, and put a memory location there, that is,
 		 * a pointer to the next free adress. */
@@ -230,18 +260,26 @@ static void add_slab(kmem_cache* cache) {
 		*curr_free = curr_addr + cache -> size;
 	}
 
-	/* For debugging -- print the first few cache lines. */
-	/*for(size_t i = 0; i < 5; i++) {
-		uint32_t *curr = (uint32_t*) starting_free_addr;
-		kprintf("CURR: %x\n", *curr);
+	/* Allocate the final block with the value 0xDEADBEEF. */
+	*((uint32_t*) curr_addr) = 0xDEADBEEF;
 
-		starting_free_addr += cache -> size;
-		curr = (uint32_t*) starting_free_addr;
-	}*/
-
-	/* Add this slab to the parent caches empty queue. */
-	// FIXME: Change back to slab -> parent_cache -> empty = slab!
-	slab -> parent_cache -> partial = slab;
+	/* Add this slab to the end parent caches empty queue.
+	 * NOTE: cache == slab -> parent_cache here! 
+	 *
+	 * One may also believe that only one empty could exist at a time, 
+	 * however, we must consider the case where memory is freed! */
+	if(!(cache -> empty)) {
+		cache -> empty = slab;
+		slab -> next = slab;
+		slab -> prev = slab;
+	} else {
+		/* l_empty == last empty slab in empty queue */
+		kmem_slab* l_empty = cache -> empty -> prev;
+		l_empty -> next = slab;
+		slab -> next = cache -> empty;
+		slab -> prev = l_empty;
+		cache -> empty -> prev = slab;
+	}
 	slab -> state = NEW;
 }		
 
@@ -273,29 +311,135 @@ static void init_kmem_caches() {
 static void* scan_partial_slab(kmem_cache* curr_cache) {
 	/* Assume we can not find something to begin with. */
 	uint32_t* partial_addr = NULL;
-	kmem_slab* partial = curr_cache -> partial;
-	if(partial) {
-		partial_addr = partial -> free;
+	/* partial_s = partial slab, not to be confused with the SET of partial slabS (with capital S).*/
+	kmem_slab* partial_s = curr_cache -> partial;
+	if(!partial_s) {
+		return (void*) NULL;
 	}
+	partial_addr = partial_s -> free;
 	
-	/* TODO: Two issues I imagine:
-	 * 	1. Checking to verify the last address is allocated 
-	 * 		- If so, need to create a new slab.
-	 * 	2. Checking to verify the last address in a block is allocated (but could be in middle). 
-	/* Logic for removing this slab from the partial slab if that slab becomes full. */
-	//if(partial_addr) {
-	//	if(*partial_addr 
-	kprintf("ADDR: %x", *partial_addr);
+	/* In the case this was the last address, 
+	 * remove from partial and add this to the full queue. */
+	if(*partial_addr == 0xDEADBEEF) {
+		/* Check to see if this is the only element in partial queue.
+		 * We do not allocate a new page/slab here, that is done on demand. */
+		if(partial_s -> next == partial_s) {
+			heap_debug_partial("PARTIAL NOW EMPTY AFTER REMOVING\n");
+			curr_cache -> partial = NULL;
+		} else {
+			/* Remove normally from partial cache. It is important to note,
+			 * the first element in the partial cache always has a free slot, so 
+			 * removal only ever comes from front. */
+			heap_debug_partial("PARTIAL STILL NOT EMPTY AFTER REMOVING\n");
+			curr_cache -> partial = partial_s -> next;
+			curr_cache -> partial -> prev = partial_s -> prev;
+			partial_s -> prev -> next = curr_cache -> partial;
+		}
 
-	return (void*) NULL;
+		/* Check if full is empty. */
+		if(!(curr_cache -> full)) {
+			heap_debug_partial("FULL IS EMPTY, ADDING\n");
+			curr_cache -> full = partial_s;
+			partial_s -> next = partial_s;
+			partial_s -> prev = partial_s;
+		} else {
+			/* If not the first element, insert at the end
+		 	* l_partial = last full. */
+			heap_debug_partial("FULL IS NOT EMPTY, ADDING");
+			kmem_slab* l_full = curr_cache -> full -> prev;
+			l_full -> next = partial_s;
+			curr_cache -> full -> prev = partial_s;
+			partial_s -> next =  curr_cache -> full;
+			partial_s -> prev = l_full;
+		}
+	}
+
+	/* After that case has been checked, just set this slabs free to the address 
+	 * that was contained in the allocated block. */
+	partial_s -> free = (uint32_t*) *partial_addr;
+
+	heap_debug_partial("INSIDE PARTIAL, RETURNED ADDRESS: %x\n", partial_addr);
+	heap_debug_partial("NEXT ADDRESS: %x\n", *partial_addr);
+
+	return (void*) partial_addr;
 }	
+
+/* Take an address from an existing empty slab and move it to the partial queue, or 
+ * create a new empty slab (also moving it). */
+static void* scan_empty_slab(kmem_cache* curr_cache) {
+	/* As far as I know right now, for small allocations, we should not have
+	 * to worry about any weird issues in selecting a memory address from a empty slab.
+	 * Things may get interesting after massive slabs... */
+
+	/* If no empties exist, create one. */
+	if(!(curr_cache -> empty)) {	
+		kprintf("ALLOC EMPTY \n");
+		add_slab(curr_cache);
+	}
+
+	/* TODO: We always assume we get memory here... that is obviously not the case. */
+	kmem_slab* curr_slab = curr_cache -> empty;
+	uint32_t* empty_addr = curr_slab -> free;
+	
+	/* Remove this slab from empty, and add it to the partial queue. */
+	if(curr_slab -> next == curr_slab) {
+		/* Only curr_slab belongs in empty queue, set it to NULL. */
+		heap_debug_empty("EMPTY EMPTY AFTER DELETING\n");
+		curr_cache -> empty = NULL;
+	} else {
+		/* Remove curr_slab from front of the empty queue. */
+		heap_debug_empty("EMPTY EMPTY FULL AFTER DELETING\n");
+		curr_cache -> empty = curr_slab -> next;
+		curr_slab -> prev -> next = curr_slab -> next;
+		curr_slab -> next -> prev = curr_slab -> prev;
+	}
+
+	if(!(curr_cache -> partial)) {
+		/* Partial is empty case. */
+		heap_debug_empty("PARTIAL IS EMPTY, ADDING\n");
+		curr_cache -> partial = curr_slab;
+		curr_slab -> next = curr_slab;
+		curr_slab -> prev = curr_slab;
+	} else {
+		/* Add to end of partial queue. 
+		 * l_partial == current last partial slab. */
+		heap_debug_empty("PARTIAL IS NOT EMPTY, ADDING\n");
+		kmem_slab* l_partial = curr_cache -> partial -> prev;
+		l_partial -> next = curr_slab;
+		curr_slab -> prev = l_partial;
+		curr_slab -> next = curr_cache -> partial;
+		curr_cache -> partial -> prev = curr_slab;
+	}
+	/* Also set the slabs new free to the next free. */
+	curr_slab -> free = (uint32_t*) *empty_addr;
+
+	heap_debug_empty("INSIDE EMPTY, RETURNED ADDRESS: %x\n", empty_addr);
+	heap_debug_empty("NEXT ADDRESS: %x\n", *empty_addr);
+	
+	/* Set the state of this slab and return mem addr. */
+	curr_slab -> state = IN_USE;
+	return (void*) empty_addr;
+}
 
 /* Return the first memory segment from the current kmem_cache. */
 static void* kmem_cache_alloc(kmem_cache* curr_cache) {
 	/* If the current cache has a partial queue, prefer that.
 	 * CPU caches will treat us a little better. */
-	(void) scan_partial_slab(curr_cache);
+	uint32_t* free_addr;
+	if(free_addr = (uint32_t*) scan_partial_slab(curr_cache)) {
+		heap_debug_kmemca("USE PARTIAL ADDR: %x\n", free_addr); 
+		return (void*) free_addr;
+	}
 
+	/* If we can not get a partial address, we have to take from a new slab.
+	 * I say take and not create, as it may be the case that a new slab already exist,
+	 * but nothing has been allocated from it just yet. */
+	if(free_addr = (uint32_t*) scan_empty_slab(curr_cache)) {
+		heap_debug_kmemca("USE EMPTY ADDR: %x\n", free_addr);
+		return (void*) free_addr;
+	}
+
+	/* Nothing found, force the calling func to deal with it. */
 	return (void*) NULL;
 }
 
@@ -349,7 +493,11 @@ void init_heap() {
 	heap_end += 0x1000;
 
 	init_kmem_caches();
-	(void*) fake_kmalloc(8);
+	(void*) fake_kmalloc(1024);
+	(void*) fake_kmalloc(1024);
+	(void*) fake_kmalloc(1024);
+	(void*) fake_kmalloc(1024);
+
 }
 
 		
