@@ -10,9 +10,10 @@
 #include <lib/string.h>
 
 // #define DEBUG_HEAP_SLAB
-#define DEBUG_HEAP_PARTIAL
-#define DEBUG_HEAP_EMPTY
+// #define DEBUG_HEAP_PARTIAL
+// #define DEBUG_HEAP_EMPTY
 #define DEBUG_HEAP_KMEMCA
+#define DEBUG_HEAP_FREE
 
 #ifdef DEBUG_HEAP_SLAB 
 	#define heap_debug_slab(...) kprintf(__VA_ARGS__)
@@ -37,6 +38,12 @@
 #else
 	#define heap_debug_kmemca(...) do { } while (0)
 #endif
+
+#ifdef DEBUG_HEAP_FREE
+	#define heap_debug_free(...) kprintf(__VA_ARGS__)
+#else
+	#define heap_debug_free(...) do {} while (0)
+#endif 
 
 /* 11/15/2026 -- Rewriting this for a SLAB allocator.
  * I don't expect this to be super similar to Linux (obviously), but the current "bump" allocator 
@@ -91,7 +98,9 @@ typedef struct kmem_slab_t {
 	 * If we have to delete one, just remove from doubly linked list. */
 	struct kmem_slab_t* next;
 	struct kmem_slab_t* prev;
-
+	
+	/* For tracking how many allocated and maximum memory chunks are in a slab. */
+	uint16_t curr_amnt, max_amnt;
 } kmem_slab;
 
 /* kmem_cache represents the memory cache which we select free chunks from 
@@ -236,6 +245,8 @@ static void add_slab(kmem_cache* cache) {
 	slab -> parent_cache = cache;
 	slab -> next = NULL;
 	slab -> prev = NULL;
+	slab -> curr_amnt = 0;
+	slab -> max_amnt = 0;
 
 	/* Find the first 8 byte aligned address to begin chopping the block up at. */
 	uint8_t starting_free_offset = ((sizeof(kmem_slab) + 7) / 8) * 8;
@@ -258,6 +269,7 @@ static void add_slab(kmem_cache* cache) {
 		 * a pointer to the next free adress. */
 		uint32_t* curr_free = (uint32_t*) curr_addr;
 		*curr_free = curr_addr + cache -> size;
+		max_amnt++;
 	}
 
 	/* Allocate the final block with the value 0xDEADBEEF. */
@@ -317,7 +329,7 @@ static void* scan_partial_slab(kmem_cache* curr_cache) {
 		return (void*) NULL;
 	}
 	partial_addr = partial_s -> free;
-	
+
 	/* In the case this was the last address, 
 	 * remove from partial and add this to the full queue. */
 	if(*partial_addr == 0xDEADBEEF) {
@@ -356,7 +368,8 @@ static void* scan_partial_slab(kmem_cache* curr_cache) {
 
 	/* After that case has been checked, just set this slabs free to the address 
 	 * that was contained in the allocated block. */
-	partial_s -> free = (uint32_t*) *partial_addr;
+	partial_s -> free = (uint32_t*) *partial_addr;	
+	(partial_s -> curr_amnt)++;
 
 	heap_debug_partial("INSIDE PARTIAL, RETURNED ADDRESS: %x\n", partial_addr);
 	heap_debug_partial("NEXT ADDRESS: %x\n", *partial_addr);
@@ -412,6 +425,7 @@ static void* scan_empty_slab(kmem_cache* curr_cache) {
 	}
 	/* Also set the slabs new free to the next free. */
 	curr_slab -> free = (uint32_t*) *empty_addr;
+	(partial_s -> curr_amnt)++;
 
 	heap_debug_empty("INSIDE EMPTY, RETURNED ADDRESS: %x\n", empty_addr);
 	heap_debug_empty("NEXT ADDRESS: %x\n", *empty_addr);
@@ -441,6 +455,11 @@ static void* kmem_cache_alloc(kmem_cache* curr_cache) {
 
 	/* Nothing found, force the calling func to deal with it. */
 	return (void*) NULL;
+}
+
+static void* kmem_cache_free(kmem_cache* curr_cache, void* free_addr) {
+
+
 }
 
 
@@ -480,6 +499,21 @@ void* fake_kmalloc(size_t size) {
 	return (void*) NULL;
 }
 
+/* Fake free function, eventually replacig the real free(). */
+void fake_free(void* free_addr) {
+	/* TODO: As of right now, this function almost just acts as a wrapper for
+	 * kmem_cache_free(). However, it will be more involved when larger allocations
+	 * are made avialable. */
+
+	/* Obtain the starting slab address. */
+	uint32_t free_slab = ((uint32_t)loc) & ~(0xFFF);		
+	heap_debug_free("FREEING ADDRESS: %x AT SLAB: %x\n", (uint32_t*)loc, free_slab);
+	
+	/* Do the work to free this address. */
+	kmem_cache* parent_cache = ((kmem_slab*) free_slab) -> parent_cache;
+	kmem_cache_free(parent_cache, free_addr);
+}
+
 void free(uint32_t* loc) {	
 	// Doing nothing rn lol
 	//
@@ -493,10 +527,10 @@ void init_heap() {
 	heap_end += 0x1000;
 
 	init_kmem_caches();
-	(void*) fake_kmalloc(1024);
-	(void*) fake_kmalloc(1024);
-	(void*) fake_kmalloc(1024);
-	(void*) fake_kmalloc(1024);
+	uint32_t* ptr1 = (uint32_t*) fake_kmalloc(1024);
+	fake_free(ptr1);
+	ptr1 = (uint32_t*) fake_kmalloc(1024);
+	fake_free(ptr1);
 
 }
 
