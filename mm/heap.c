@@ -457,9 +457,120 @@ static void* kmem_cache_alloc(kmem_cache* curr_cache) {
 	return (void*) NULL;
 }
 
-static void* kmem_cache_free(kmem_cache* curr_cache, void* free_addr) {
+/* Free a memory address, but do not touch the slab's state. */
+static void free_slab(kmem_slab* curr_slab, void* free_addr) {
+	/* Obtain the memory address at the start of the free list. */
+	uint32_t* first_free = curr_slab -> free;
+	
+	/* Cast free address into a uint32_t*, storing this newly caculated address. */
+	free_addr = (uin32_t*) free_addr;
+	*free_addr = first_free;
+	
+	/* Set the first free address to the newly freed address in slab. */
+	curr_slab -> free = free_addr;
+}
 
+/* Free a memory address and add this slab to the caches partial queue. */
+static void free_full_slab(kmem_cache* curr_cache, kmem_slab* curr_slab, void* free_addr) {
+	/* Remove from the slab from the current full queue. */
 
+	/* This check has been performed a few times by this point. 
+	 * First condition checks checks to see if we are only slab in full queue. */
+	if(curr_slab -> next == curr_slab) {
+		curr_cache -> full = NULL;
+	else {
+		/* For allocation involving empty -> partial or partial->full, 
+		 * we are guaranteed to be working at the head of the queue. 
+		 * This logic does not apply for the full queues transition to 
+		 * partial, so additional check it required */
+		if(curr_slab == (curr_cache -> full)) {
+			curr_cache -> full = curr_slab -> next;
+		}
+		/* Remove the current slab from where ever it may be in the full queue. */
+		curr_slab -> next -> prev = curr_slab -> prev;
+		curr_slab -> prev -> next = curr_slab -> next;
+	}
+
+	/* Add this slab back into the partial queue, first checking if partial is empty. */
+	if(curr_cache -> partial == NULL) {
+		curr_cache -> partial = curr_slab;
+		curr_slab -> next = curr_slab;
+		curr_slab -> prev = curr_slab;
+	} else {
+		/* Add this slab to end of partial queue. */
+		kmem_slab* l_partial = curr_cache -> partial -> prev;
+		curr_cache -> partial -> prev = curr_slab;
+		curr_slab -> next = curr_cache -> partial;
+		curr_slab -> prev = l_partial;
+		l_partial -> next = curr_slab;
+	}
+
+	/* Free this memory in the slab. */
+	free_slab(curr_slab, free_addr);
+	(curr_slab -> curr_amnt)--;
+}
+
+static void free_partial_slab(kmem_cache* curr_cache, kmem_slab* curr_slab, void* free_addr) {
+	/* Current slab is front of queue, so do nothing. */
+	if(curr_slab -> next == curr_slab) {
+		curr_cache -> partial = NULL;
+	else {
+		/* As above, multiple partial queues may exist at once after a
+		 * freeing operation, so be careful where you remove from. */
+		if(curr_slab == (curr_cache -> partial)) {
+			curr_cache -> partial = curr_slab -> next;
+		}
+		/* Remove the current slab from where ever it may be in the full queue. */
+		curr_slab -> next -> prev = curr_slab -> prev;
+		curr_slab -> prev -> next = curr_slab -> next;
+	}
+
+	/* Add this slab back into the empty queue, first checking if empty is empty. */
+	if(curr_cache -> empty == NULL) {
+		curr_cache -> empty = curr_slab;
+		curr_slab -> next = curr_slab;
+		curr_slab -> prev = curr_slab;
+	} else {
+		/* Add this slab to end of empty queue. */
+		kmem_slab* l_empty = curr_cache -> empty -> prev;
+		curr_cache -> empty -> prev = curr_slab;
+		curr_slab -> next = curr_cache -> empty;
+		curr_slab -> prev = l_empy;
+		l_empty -> next = curr_slab;
+	}
+
+	/* Free this memory in the slab. */
+	free_slab(curr_slab, free_addr);
+	
+	/* Decrement the current amount of slabs and set this slab to USED. */
+	(curr_slab -> curr_amnt)--;
+	curr_slab -> state = USED;
+}
+
+/* Free a memory address from a "small" slab (512 bytes MAX). 
+ * This will not be used for larger allocations where an additional slab 
+ * is used to point at the buffer. */
+static void kmem_cache_free(kmem_cache* curr_cache, void* free_addr) {
+	/* Check if the cache is full. If it is, we need to remove it from the 
+	 * full cache and add it to the partial cache. */
+	uint32_t free_slab = ((uint32_t)free_addr) & ~(0xFFF);	
+	kmem_slab* curr_slab = (kmem_slab*) curr_slab;
+	uint16_t curr_alloc = curr_slab -> curr_amnt;
+	uint16_t max_alloc = curr_slab -> max_amnt;
+
+	/* If condition is true, the slab is obviously full */
+	if(curr_alloc == max_alloc) { 
+		free_full_slab(curr_cache, curr_slab, free_addr)
+		return;
+	}
+	
+	/* If we only have one slab, then we become empty. 
+	 * Else just free this address normally. */
+	if(curr_alloc - 1 == 0) ? 
+			free_partial_slab(curr_cache, curr_slab, free_addr) 
+				: free_slab(curr_slab, free_addr);
+
+	/* Rely on callers to set additional meta data, i.e. curr_amnt and slab_state */
 }
 
 
@@ -506,8 +617,8 @@ void fake_free(void* free_addr) {
 	 * are made avialable. */
 
 	/* Obtain the starting slab address. */
-	uint32_t free_slab = ((uint32_t)loc) & ~(0xFFF);		
-	heap_debug_free("FREEING ADDRESS: %x AT SLAB: %x\n", (uint32_t*)loc, free_slab);
+	uint32_t free_slab = ((uint32_t)free_addr) & ~(0xFFF);		
+	heap_debug_free("FREEING ADDRESS: %x AT SLAB: %x\n", (uint32_t*)free_addr, free_slab);
 	
 	/* Do the work to free this address. */
 	kmem_cache* parent_cache = ((kmem_slab*) free_slab) -> parent_cache;
