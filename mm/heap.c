@@ -56,8 +56,9 @@
 /* Redefinition of kmem_cache for use inside kmem_slab. */
 typedef struct kmem_cache_t;
 
-/* Current number of kmem_caches that exist. */
-#define KMEM_CACHES		0x8
+/* Current number of kmem_caches that exist, for small and large caches. */
+#define KMEM_CACHES		0x6
+#define KMEM_CACHES_L 		0x5
 
 /* Starting location of the Kernel Heap.
  * For now, this space is 0xC1000000 - 0xD0000000.*/
@@ -132,6 +133,9 @@ static kmem_cache kmem_caches[] = {
 	{"kmem_cache_256", 256},
 	{"kmem_cache_512", 512},
 	{"kmem_cache_1024", 1024},
+	{"kmem_cache_2048", 2048},
+	{"kmem_cache_4096", 4096},
+	{"kmem_cache_8192", 8192},
 };
 
 /* FIXME: For now, these stay, until I fix the allocator. */
@@ -303,18 +307,29 @@ static void add_slab(kmem_cache* cache) {
 static void init_kmem_caches() {
 	/* Zero the bitmap. */
 	init_page_bitmap();
-
+	
+	size_t cache_num = 0;
+	kmem_cache* curr_cache = NULL;
 	/* Interate through all kmem_caches, initializing the first slabs. */
-	for(size_t cache_num = 0; cache_num < KMEM_CACHES; cache_num++) {
+	for(; cache_num < KMEM_CACHES; cache_num++) {
 		/* Initialize the first fields of the cache. 
 		 * size and cache_name are already intialized.*/
-		kmem_cache* curr_cache = kmem_caches + cache_num;
+		curr_cache = kmem_caches + cache_num;
 		curr_cache -> empty = NULL;
 		curr_cache -> full = NULL;
 		curr_cache -> partial = NULL;
 
 		/* Initialize the first slab, which belongs to this caches empty by default. */
-		add_slab(kmem_caches + cache_num);
+		add_slab(curr_cache);
+	}
+
+	/* Initialize the larger memory caches. 
+	 * Each slab points to some other buffer, not a free memory location on the slab. */
+	for(; cache_num < KMEM_CACHES + KMEM_CACHES_L; cache_num++) {
+		curr_cache = kmem_caches + cache_num;
+		curr_cache -> empty = NULL;
+		curr_cache -> full = NULL;
+		curr_cache -> partial = NULL;
 	}
 }
 
