@@ -14,6 +14,10 @@
 // #define DEBUG_HEAP_EMPTY
 #define DEBUG_HEAP_KMEMCA
 #define DEBUG_HEAP_FREE
+#define DEBUG_HEAP_KMEMCF
+#define DEBUG_HEAP_FFSLAB
+#define DEBUG_HEAP_FPSLAB
+#define DEBUG_HEAP_FREEAD
 
 #ifdef DEBUG_HEAP_SLAB 
 	#define heap_debug_slab(...) kprintf(__VA_ARGS__)
@@ -44,6 +48,30 @@
 #else
 	#define heap_debug_free(...) do {} while (0)
 #endif 
+
+#ifdef DEBUG_HEAP_KMEMCF
+	#define heap_debug_kmemcf(...) kprintf(__VA_ARGS__)
+#else
+	#define heap_debug_kmemcf(...) do {} while (0)
+#endif 
+
+#ifdef DEBUG_HEAP_FFSLAB
+	#define heap_debug_ffslab(...) kprintf(__VA_ARGS__)
+#else
+	#define heap_debug_ffslab(...) do {} while (0)
+#endif 
+
+#ifdef DEBUG_HEAP_FPSLAB
+	#define heap_debug_fpslab(...) kprintf(__VA_ARGS__)
+#else
+	#define heap_debug_fpslab(...) do {} while (0)
+#endif
+
+#ifdef DEBUG_HEAP_FREEAD
+	#define heap_debug_freead(...) kprintf(__VA_ARGS__)
+#else
+	#define heap_debug_freead(...) do {} while (0)
+#endif
 
 /* 11/15/2026 -- Rewriting this for a SLAB allocator.
  * I don't expect this to be super similar to Linux (obviously), but the current "bump" allocator 
@@ -273,11 +301,12 @@ static void add_slab(kmem_cache* cache) {
 		 * a pointer to the next free adress. */
 		uint32_t* curr_free = (uint32_t*) curr_addr;
 		*curr_free = curr_addr + cache -> size;
-		max_amnt++;
+		(slab -> max_amnt)++;
 	}
 
 	/* Allocate the final block with the value 0xDEADBEEF. */
 	*((uint32_t*) curr_addr) = 0xDEADBEEF;
+	(slab -> max_amnt)++;
 
 	/* Add this slab to the end parent caches empty queue.
 	 * NOTE: cache == slab -> parent_cache here! 
@@ -311,7 +340,7 @@ static void init_kmem_caches() {
 	size_t cache_num = 0;
 	kmem_cache* curr_cache = NULL;
 	/* Interate through all kmem_caches, initializing the first slabs. */
-	for(; cache_num < KMEM_CACHES; cache_num++) {
+	for(; cache_num < KMEM_CACHES + KMEM_CACHES_L; cache_num++) {
 		/* Initialize the first fields of the cache. 
 		 * size and cache_name are already intialized.*/
 		curr_cache = kmem_caches + cache_num;
@@ -325,12 +354,12 @@ static void init_kmem_caches() {
 
 	/* Initialize the larger memory caches. 
 	 * Each slab points to some other buffer, not a free memory location on the slab. */
-	for(; cache_num < KMEM_CACHES + KMEM_CACHES_L; cache_num++) {
-		curr_cache = kmem_caches + cache_num;
-		curr_cache -> empty = NULL;
-		curr_cache -> full = NULL;
-		curr_cache -> partial = NULL;
-	}
+//	for(; cache_num < KMEM_CACHES + KMEM_CACHES_L; cache_num++) {
+//		curr_cache = kmem_caches + cache_num;
+//		curr_cache -> empty = NULL;
+//		curr_cache -> full = NULL;
+//		curr_cache -> partial = NULL;
+//	}
 }
 
 /* Scan the partial slab, looking for a free address to return. 
@@ -440,7 +469,7 @@ static void* scan_empty_slab(kmem_cache* curr_cache) {
 	}
 	/* Also set the slabs new free to the next free. */
 	curr_slab -> free = (uint32_t*) *empty_addr;
-	(partial_s -> curr_amnt)++;
+	(curr_slab -> curr_amnt)++;
 
 	heap_debug_empty("INSIDE EMPTY, RETURNED ADDRESS: %x\n", empty_addr);
 	heap_debug_empty("NEXT ADDRESS: %x\n", *empty_addr);
@@ -475,14 +504,16 @@ static void* kmem_cache_alloc(kmem_cache* curr_cache) {
 /* Free a memory address, but do not touch the slab's state. */
 static void free_slab(kmem_slab* curr_slab, void* free_addr) {
 	/* Obtain the memory address at the start of the free list. */
-	uint32_t* first_free = curr_slab -> free;
-	
+	uint32_t* first_free = curr_slab -> free;	
+	heap_debug_freead("FREEING ADDRESS: %x\n", (uint32_t*) free_addr);
+
 	/* Cast free address into a uint32_t*, storing this newly caculated address. */
-	free_addr = (uin32_t*) free_addr;
-	*free_addr = first_free;
+	uint32_t* free_addr_nvoid = (uint32_t*) free_addr;
+	*free_addr_nvoid = (uint32_t) first_free;
 	
 	/* Set the first free address to the newly freed address in slab. */
 	curr_slab -> free = free_addr;
+	(curr_slab -> curr_amnt)--; 
 }
 
 /* Free a memory address and add this slab to the caches partial queue. */
@@ -493,7 +524,7 @@ static void free_full_slab(kmem_cache* curr_cache, kmem_slab* curr_slab, void* f
 	 * First condition checks checks to see if we are only slab in full queue. */
 	if(curr_slab -> next == curr_slab) {
 		curr_cache -> full = NULL;
-	else {
+	} else {
 		/* For allocation involving empty -> partial or partial->full, 
 		 * we are guaranteed to be working at the head of the queue. 
 		 * This logic does not apply for the full queues transition to 
@@ -505,7 +536,7 @@ static void free_full_slab(kmem_cache* curr_cache, kmem_slab* curr_slab, void* f
 		curr_slab -> next -> prev = curr_slab -> prev;
 		curr_slab -> prev -> next = curr_slab -> next;
 	}
-
+	heap_debug_ffslab("FREEING FULL -> PARTIAL\n");
 	/* Add this slab back into the partial queue, first checking if partial is empty. */
 	if(curr_cache -> partial == NULL) {
 		curr_cache -> partial = curr_slab;
@@ -522,14 +553,13 @@ static void free_full_slab(kmem_cache* curr_cache, kmem_slab* curr_slab, void* f
 
 	/* Free this memory in the slab. */
 	free_slab(curr_slab, free_addr);
-	(curr_slab -> curr_amnt)--;
 }
 
 static void free_partial_slab(kmem_cache* curr_cache, kmem_slab* curr_slab, void* free_addr) {
 	/* Current slab is front of queue, so do nothing. */
 	if(curr_slab -> next == curr_slab) {
 		curr_cache -> partial = NULL;
-	else {
+	} else {
 		/* As above, multiple partial queues may exist at once after a
 		 * freeing operation, so be careful where you remove from. */
 		if(curr_slab == (curr_cache -> partial)) {
@@ -539,7 +569,7 @@ static void free_partial_slab(kmem_cache* curr_cache, kmem_slab* curr_slab, void
 		curr_slab -> next -> prev = curr_slab -> prev;
 		curr_slab -> prev -> next = curr_slab -> next;
 	}
-
+	heap_debug_fpslab("FREEING PARTIAL -> EMPTY\n");
 	/* Add this slab back into the empty queue, first checking if empty is empty. */
 	if(curr_cache -> empty == NULL) {
 		curr_cache -> empty = curr_slab;
@@ -550,7 +580,7 @@ static void free_partial_slab(kmem_cache* curr_cache, kmem_slab* curr_slab, void
 		kmem_slab* l_empty = curr_cache -> empty -> prev;
 		curr_cache -> empty -> prev = curr_slab;
 		curr_slab -> next = curr_cache -> empty;
-		curr_slab -> prev = l_empy;
+		curr_slab -> prev = l_empty;
 		l_empty -> next = curr_slab;
 	}
 
@@ -558,7 +588,6 @@ static void free_partial_slab(kmem_cache* curr_cache, kmem_slab* curr_slab, void
 	free_slab(curr_slab, free_addr);
 	
 	/* Decrement the current amount of slabs and set this slab to USED. */
-	(curr_slab -> curr_amnt)--;
 	curr_slab -> state = USED;
 }
 
@@ -568,23 +597,26 @@ static void free_partial_slab(kmem_cache* curr_cache, kmem_slab* curr_slab, void
 static void kmem_cache_free(kmem_cache* curr_cache, void* free_addr) {
 	/* Check if the cache is full. If it is, we need to remove it from the 
 	 * full cache and add it to the partial cache. */
-	uint32_t free_slab = ((uint32_t)free_addr) & ~(0xFFF);	
-	kmem_slab* curr_slab = (kmem_slab*) curr_slab;
-	uint16_t curr_alloc = curr_slab -> curr_amnt;
-	uint16_t max_alloc = curr_slab -> max_amnt;
-
+	uint32_t f_slab = ((uint32_t)free_addr) & ~(0xFFF);	
+	kmem_slab* curr_slab = (kmem_slab*) f_slab;
+	volatile uint16_t curr_alloc = curr_slab -> curr_amnt;
+	volatile uint16_t max_alloc = curr_slab -> max_amnt;
+	heap_debug_free("CURR_ALLOC: %d, MAX_ALLOC %d\n", curr_alloc, max_alloc);
 	/* If condition is true, the slab is obviously full */
-	if(curr_alloc == max_alloc) { 
-		free_full_slab(curr_cache, curr_slab, free_addr)
+	if(curr_alloc == max_alloc) {
+		heap_debug_free("SLAB IS FULL\n");
+		free_full_slab(curr_cache, curr_slab, free_addr);
 		return;
 	}
 	
 	/* If we only have one slab, then we become empty. 
 	 * Else just free this address normally. */
-	if(curr_alloc - 1 == 0) ? 
-			free_partial_slab(curr_cache, curr_slab, free_addr) 
-				: free_slab(curr_slab, free_addr);
-
+	if(curr_alloc == 1) {
+		free_partial_slab(curr_cache, curr_slab, free_addr);
+	} else {
+		free_slab(curr_slab, free_addr);
+	}
+	heap_debug_free("SLAB IS PARTIAL\n");
 	/* Rely on callers to set additional meta data, i.e. curr_amnt and slab_state */
 }
 
@@ -615,7 +647,7 @@ void* fake_kmalloc(size_t size) {
 	}
 
 	/* Find the cache with the smallest chunk that fits this request. */
-	for(size_t cache_num = 0; cache_num < KMEM_CACHES; cache_num++) {
+	for(size_t cache_num = 0; cache_num < KMEM_CACHES + KMEM_CACHES_L; cache_num++) {
 		kmem_cache* curr_cache = kmem_caches + cache_num;
 		if(curr_cache -> size >= size) {
 			return kmem_cache_alloc(curr_cache);
@@ -654,7 +686,11 @@ void init_heap() {
 
 	init_kmem_caches();
 	uint32_t* ptr1 = (uint32_t*) fake_kmalloc(1024);
+	uint32_t* ptr2 = (uint32_t*) fake_kmalloc(1024);
+	uint32_t* ptr3 = (uint32_t*) fake_kmalloc(1024);
 	fake_free(ptr1);
+	fake_free(ptr2);
+	fake_free(ptr3);
 	ptr1 = (uint32_t*) fake_kmalloc(1024);
 	fake_free(ptr1);
 
