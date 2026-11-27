@@ -12,12 +12,12 @@
 // #define DEBUG_HEAP_SLAB
 // #define DEBUG_HEAP_PARTIAL
 // #define DEBUG_HEAP_EMPTY
-#define DEBUG_HEAP_KMEMCA
-#define DEBUG_HEAP_FREE
-#define DEBUG_HEAP_KMEMCF
-#define DEBUG_HEAP_FFSLAB
-#define DEBUG_HEAP_FPSLAB
-#define DEBUG_HEAP_FREEAD
+// #define DEBUG_HEAP_KMEMCA
+// #define DEBUG_HEAP_FREE
+// #define DEBUG_HEAP_KMEMCF
+// #define DEBUG_HEAP_FFSLAB
+// #define DEBUG_HEAP_FPSLAB
+// #define DEBUG_HEAP_FREEAD
 
 #ifdef DEBUG_HEAP_SLAB 
 	#define heap_debug_slab(...) kprintf(__VA_ARGS__)
@@ -93,6 +93,7 @@ typedef struct kmem_cache_t;
 #define KERNEL_HEAP_START 	0xC1000000u
 #define MAX_PAGES 		0x16800u
 #define PAGE_SIZE 	 	0x1000
+#define INIT_LARGE_SLABS 	0x4
 
 /* Page Bitmap we use for allocations. */
 static uint8_t page_bitmap[MAX_PAGES];
@@ -108,7 +109,6 @@ typedef enum slab_state_t {
 	IN_USE = 0x1,
 	USED = 0x2
 } slab_state;
-
 
 /* kmem_slabs are placed at the start of an allocated slab. 
  * A free list is used to maintain what to allocate.
@@ -130,6 +130,12 @@ typedef struct kmem_slab_t {
 	
 	/* For tracking how many allocated and maximum memory chunks are in a slab. */
 	uint16_t curr_amnt, max_amnt;
+
+	/* Bitmap for tracking larger allocations.
+	 * Originally, Bonwick's paper mentioned a kmem_bufctl object.
+	 * This is only used for larger allocations and should be ignored for 
+	 * allocations under 256 B */
+	uint8_t alloc_bitmap;
 } kmem_slab;
 
 /* kmem_cache represents the memory cache which we select free chunks from 
@@ -328,6 +334,24 @@ static void add_slab(kmem_cache* cache) {
 	slab -> state = NEW;
 }		
 
+/* Similar to above, but we add a slab to the larger caches. */
+static void add_slab_l(kmem_cache* cache) {
+	/* Use our smaller allocator to give use a cache address. */
+	kmem_slab* curr_slab = (kmem_slab*) fake_kmalloc(sizeof(kmem_slab));
+
+	curr_slab -> free = NULL;
+	curr_slab -> parent_cache = cache;
+	curr_slab -> next = NULL;
+	curr_slab -> prev = NULL;
+	curr_slab -> curr_amnt = 0;
+	curr_slab -> max_amnt = 0;
+	
+	/* Determine how much memory to request.
+	 * TODO: Add a method that gives us */
+
+}
+
+
 /* Init all the caches. 
  * This involves requesting and mapping memory, then carving the slabs into each of these pages.
  * Each kmem_cache will intially start with only a single slab. 
@@ -340,7 +364,7 @@ static void init_kmem_caches() {
 	size_t cache_num = 0;
 	kmem_cache* curr_cache = NULL;
 	/* Interate through all kmem_caches, initializing the first slabs. */
-	for(; cache_num < KMEM_CACHES + KMEM_CACHES_L; cache_num++) {
+	for(; cache_num < KMEM_CACHES; cache_num++) {
 		/* Initialize the first fields of the cache. 
 		 * size and cache_name are already intialized.*/
 		curr_cache = kmem_caches + cache_num;
@@ -354,12 +378,19 @@ static void init_kmem_caches() {
 
 	/* Initialize the larger memory caches. 
 	 * Each slab points to some other buffer, not a free memory location on the slab. */
-//	for(; cache_num < KMEM_CACHES + KMEM_CACHES_L; cache_num++) {
-//		curr_cache = kmem_caches + cache_num;
-//		curr_cache -> empty = NULL;
-//		curr_cache -> full = NULL;
-//		curr_cache -> partial = NULL;
-//	}
+	for(; cache_num < KMEM_CACHES + KMEM_CACHES_L; cache_num++){
+		curr_cache = kmem_caches + cache_num;
+		curr_cache -> empty = NULL;
+		curr_cache -> full = NULL;
+		curr_cache -> partial = NULL;
+
+		/* Initially allocated 4 slabs of varying sizes seems "fair".
+		 * Decent amount RTG, and do not have to worry about slow allocs right away. */
+		for(size_t inc = 0; inc < INIT_LARGE_SLABS; inc++) {
+			/* add_slab LARGE. Still adds the slab to the empty queue. */
+			add_slab_l(curr_cache);
+		}
+	}
 }
 
 /* Scan the partial slab, looking for a free address to return. 
@@ -685,6 +716,7 @@ void init_heap() {
 	heap_end += 0x1000;
 
 	init_kmem_caches();
+	/*
 	uint32_t* ptr1 = (uint32_t*) fake_kmalloc(1024);
 	uint32_t* ptr2 = (uint32_t*) fake_kmalloc(1024);
 	uint32_t* ptr3 = (uint32_t*) fake_kmalloc(1024);
@@ -693,6 +725,7 @@ void init_heap() {
 	fake_free(ptr3);
 	ptr1 = (uint32_t*) fake_kmalloc(1024);
 	fake_free(ptr1);
+	*/
 
 }
 
