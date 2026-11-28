@@ -345,10 +345,25 @@ static void add_slab_l(kmem_cache* cache) {
 	curr_slab -> prev = NULL;
 	curr_slab -> curr_amnt = 0;
 	curr_slab -> max_amnt = 0;
-	
-	/* Determine how much memory to request.
-	 * TODO: Add a method that gives us */
+	curr_slab -> alloc_bitmap = 0;
 
+	/* Determine how much memory to request.
+	 *
+	 * If the size of the cache, and in turn the requested memory, is greater than 
+	 * two pages, we need to request an aligned memory address from the PMM (and mapped via the VMM). *
+	 * TODO: Add a method that gives us */
+	if(cache -> size > PAGE_SIZE) {
+		// large_req() ???
+	} else {
+		/* For larger allocations, we will just treat the free* as a pointer 
+		 * to the start of the allocated memory. */
+		curr_slab -> free = page_alloc();
+	}
+
+	/* TODO: Add a this entry to the hash map for alloc -> slab translations. */
+	
+	/* Add this slab to the empty queue for now. */
+	
 }
 
 
